@@ -106,9 +106,11 @@ requests_made = 0.0
 
 update_query_found = "UPDATE Yelp_Listings set external_url=%s, manually_scanned = 1 where yelp_ID=%s"
 update_query_not_found = "UPDATE Yelp_Listings set manually_scanned = 1 where yelp_ID=%s"
-per_call_delay = 90
+
+
+
 for k, url in enumerate(res):
-    
+    per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/yelp_ext_url_scan_parameters', 'r').read()).group(1))
     if k > 0:
         log_msg("Being a good internet citizen and waiting for %d seconds before searching %s (%d out of %d)" % (per_call_delay, url[0], k+1, len(res)))
         for j in range(per_call_delay):

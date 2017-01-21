@@ -129,8 +129,9 @@ count_query = "SELECT count(1) from Yelp_Listings where active=1 and search_zip=
 search_query = "SELECT count(1) from Yelp_Listings where active=1 and yelp_ID=%s and data_capture_campaign_ID=%s"
 insert_query = "INSERT INTO Yelp_Listings (time_captured, search_zip, yelp_ID, data_capture_campaign_ID, yelp_name, yelp_url, external_url, yelp_category, yelp_phone, is_closed, yelp_city, yelp_state, yelp_zip, country_code, manually_scanned, scanned_ext_for_emails, active) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 
-per_call_delay = 15
 for z_count, zip_code in enumerate(zips):
+    per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/scan_yelp_parameters', 'r').read()).group(1))
+
     if zip_code != "00000":
         count_param = [zip_code]
         

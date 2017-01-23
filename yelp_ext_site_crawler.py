@@ -73,11 +73,12 @@ def get_links(url, layer, offset, parent, tag_type):
         #print("create http for %s" % url)
         log_msg("Create http for %s\n" % url, no_print=True)
         time.sleep(1)
-        http = httplib2.Http()
+        http = httplib2.Http(timeout=20)
         #print("make request")
         try:
             requests_made += 1
             status, response = http.request(url)
+            log_msg("Returned a response of length %d" % len(response), no_print=True)
         except httplib.InvalidURL: 
             log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url)
             status = None
@@ -142,29 +143,33 @@ def get_links(url, layer, offset, parent, tag_type):
                                     link_domain = None
                                     if m is not None:
                                         link_domain = m.group(4)
-                                    #print("%s led to %s\n\t%s vs %s\n\n%s\n\n" % (url, link_url, url_domain, link_domain, m.groups()))
-                                    # Check if the domains match
-                                    domain_match = False
-                                    url_domain = url_domain.replace("www.", "")
-                                    link_domain = link_domain.replace("www.", "")
-                                    if url_domain in link_domain or link_domain in url_domain:
-                                        domain_match = True
-                                    #print("%s led to %s\n\t%s vs %s\n\n%s\n\n" % (url, link_url, url_domain, link_domain, m.groups()))
-                                        
-                                    if link_url != "" and link_url != url  and processed_links < 500 and domain_match:
-                                        if link_url.endswith("#"):
-                                            log_msg("\t\tI have removed the trailing number sign from %s" % (link_url), no_print=True)
-                                            link_url = link_url[0:-1]
-                                        if link_url not in all_links:
-                                            log_msg("\tFound %s" % (link_url), no_print=True)
-                                            all_links.append(link_url)
-                                            if len(all_links) % 100 == 0 or (len(all_links) < 100 and len(all_links) % 25 == 0):
-                                                log_msg("  %04d links found so far\t\t%04d requests already made..." % (len(all_links), requests_made))
-                                            processed_links += 1
-                                            new_links_found += 1
-                                            if not link_url.endswith(".jpg") and not link_url.endswith(".png") and not link_url.endswith(".pdf"):
-                                                get_links(link_url, layer+1, offset + ">>", url, 'a')
-                           
+                                        #print("%s led to %s\n\t%s vs %s\n\n%s\n\n" % (url, link_url, url_domain, link_domain, m.groups()))
+                                        # Check if the domains match
+                                        domain_match = False
+                                        if link_domain is not None:
+                                            url_domain = url_domain.replace("www.", "")
+                                            link_domain = link_domain.replace("www.", "")
+                                            if url_domain in link_domain or link_domain in url_domain:
+                                                domain_match = True
+                                            #print("%s led to %s\n\t%s vs %s\n\n%s\n\n" % (url, link_url, url_domain, link_domain, m.groups()))
+                                                
+                                            if link_url != "" and link_url != url  and new_links_found < 100 and domain_match:
+                                                if link_url.endswith("#"):
+                                                    log_msg("\t\tI have removed the trailing number sign from %s" % (link_url), no_print=True)
+                                                    link_url = link_url[0:-1]
+                                                if link_url not in all_links:
+                                                    log_msg("\tFound %s" % (link_url), no_print=True)
+                                                    all_links.append(link_url)
+                                                    if len(all_links) % 100 == 0 or (len(all_links) < 100 and len(all_links) % 25 == 0):
+                                                        log_msg("  %04d links found so far\t\t%04d requests already made..." % (len(all_links), requests_made))
+                                                    processed_links += 1
+                                                    new_links_found += 1
+                                                    if not link_url.endswith(".jpg") and not link_url.endswith(".png") and not link_url.endswith(".pdf"):
+                                                        get_links(link_url, layer+1, offset + ">>", url, 'a')
+                                        else:
+                                            log_msg("\tNo domain found for %s" % (link_url))
+                                    else:
+                                        log_msg("\tNo domain found for %s" % (link_url))
                             
     content_type = ''
     if not url.startswith("http"):
@@ -201,7 +206,7 @@ def log_msg(s, no_print=False):
     if not no_print:
         print(s)
     log = open(log_file, 'a')
-    log.write("%s\n" % s)
+    log.write("%s  %s\n" % (datetime.datetime.today().strftime("%H:%M:%S"), s)
     log.close()
     
 # Create a connection to the database
@@ -288,4 +293,4 @@ for site in sites:
         print("\n\n\tReminder, results were not committed to the DB!!!!\n\n")
     cursor.close()
     mysql_conn.close()
-    
+log_msg("\n\n  DONE!!!")

@@ -92,7 +92,7 @@ log_.close()
 def log_msg(s):
     print(s)
     log = open(log_file, 'a')
-    log.write("%s\n" % s)
+    log.write("%s  %s\n" % (datetime.datetime.today().strftime("%H:%M:%S"),s))
     log.close()
     
 # Create a connection to the database
@@ -116,6 +116,9 @@ start_ms = current_milli_time()
 total_calls = float(0.0)
 first_call = True
 for handle in res:
+    twitter_handle = handle[1]
+    per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/download_tweets_parameters', 'r').read()).group(1))
+
     handle_tweets_added = 0
     handle_tweets_already_added = 0
     download_start = datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S") 
@@ -124,8 +127,8 @@ for handle in res:
     try:
     #if True:
         if not first_call:
-            log_msg("Wait for 240.")
-            for i in range(240):
+            log_msg("Wait for %d." % (per_call_delay/2))
+            for i in range(per_call_delay/2):
                 time.sleep(1)
         first_call = False
         log_msg("Read timeline for %s (%d)" % (handle[1], handle[0]))
@@ -135,21 +138,32 @@ for handle in res:
         latest = user_timeline[0]["id"]
         print ("Last ID: %s" % latest)
         points=[latest]
-        log_msg("Wait for 240 seconds...")
-        for i in range(240):
+        log_msg("Wait for %d." % (per_call_delay/2))
+        for i in range(per_call_delay/2):
             time.sleep(1)
     except IndexError as e:
         handle = None
     except TwythonAuthError as e:
-        log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
-        log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
-        log_msg("Error text: %s" % e)
-        handle = None
-        api = None
-        sys.exit()
+        if "Twitter API returned a 401 (Unauthorized)" in str(e):
+            log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+            log_msg("Error text: %s" % e)
+            handle = None
+            api = None
+        else:
+            log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+            log_msg("Error text: %s" % e)
+            handle = None
+            api = None
+            sys.exit()
         
     if handle is not None:
         for i in range(0, 16):
+            per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/download_tweets_parameters', 'r').read()).group(1))
+
             log_msg("Read timeline for %s (%d) %d/16" % (handle[1], handle[0], i+1))
             if i > 0:
                 api = authenticate_me("zack")
@@ -160,6 +174,7 @@ for handle in res:
             except TwythonAuthError as e:
                 log_msg("2) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
                 log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+                log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
                 log_msg("Error text: %s" % e)
                 handle = None
                 api = None
@@ -241,8 +256,8 @@ for handle in res:
             
             mysql_conn.commit(); cursor.close(); mysql_conn.close() 
                 
-            log_msg("Wait for 480 seconds...")
-            for i in range(480):
+            log_msg("Wait for %d seconds..." % per_call_delay)
+            for i in range(per_call_delay):
                 time.sleep(1)
             if count_of_tweets == 1:
                 log_msg("Only one tweet was pulled, must have reached the end of the stream, exit pull for %s" % handle[1])
@@ -265,6 +280,20 @@ for handle in res:
         param = [download_start, handle[1]]
         cursor.execute(query, param)
         mysql_conn.commit(); cursor.close(); mysql_conn.close()     
+    else:
+        mysql_conn, r = mysql_connect();  mysql_attempts = 0
+        while mysql_conn is None and mysql_attempts < 10:
+            time.sleep(15)
+            mysql_conn, r = mysql_connect();  mysql_attempts += 1
+        if mysql_conn is None:
+            log_msg("Could not connect to MySQL after 10 tries...exiting.")
+            sys.exit()
+        cursor = mysql_conn.cursor()
+        log_msg("Error reading %s - %d tweets added; %d tweets already stored" % (twitter_handle, handle_tweets_added, handle_tweets_already_added))   
+        query = "UPDATE Twitter_Accounts set last_twitter_download=%s, total_twitter_downloads=total_twitter_downloads+1 where twitter_handle=%s"
+        param = [download_start, twitter_handle]
+        cursor.execute(query, param)
+        mysql_conn.commit(); cursor.close(); mysql_conn.close()  
 #f.close()
 session_end_time = datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S")
 

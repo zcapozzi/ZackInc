@@ -4,7 +4,7 @@ import MySQLdb
 import subprocess
 import telegram
 import requests
-import httplib2, httplib
+import httplib2, httplib, zlib
 from BeautifulSoup import BeautifulSoup, SoupStrainer
 reload(sys)
 sys.setdefaultencoding("utf-8")
@@ -14,7 +14,7 @@ from socket import error as socket_error
 import ssl
 from subprocess import Popen, PIPE
 
-import clipboard
+from random import shuffle
 
 def mysql_connect():
     cnx = None
@@ -57,7 +57,7 @@ def log_msg(s, no_print=False):
     if not no_print:
         print(s)
     log = open(log_file, 'a')
-    log.write("%s\n" % s)
+    log.write("%s  %s\n" % (datetime.datetime.today().strftime("%H:%M:%S"),s))
     log.close()
     
 # Create a connection to the database
@@ -94,7 +94,15 @@ select_query = "Select count(1) from Emails where email_address=%s and email_scr
 insert_query = "INSERT INTO Emails (company_ID, person_ID, email_address, email_domain, active, total_emails, last_send, total_responses, removed, usercode, email_scrape_ID, found_on, source_url, yelp_listing_ID) VALUES (-1, -1, %s, '', 1, 0, '1900-01-01 01:00:00', 0, 0, '', %s, %s, %s, %s)"
 per_call_delay = 30
 last_domain = ""
-for k, url in enumerate(res):
+
+# Randomly shuffle the pages to be searched so that no one host gets pinged repeatedly and consecutively
+rng = range(0, len(res))
+shuffle(rng)
+res2 = []
+for i in rng:
+    res2.append(res[i])
+
+for k, url in enumerate(res2):
     m = domain_regex.search(url[0])
     if m is not None:
         domain = "%s%s" % (m.group(1), m.group(3))
@@ -103,6 +111,7 @@ for k, url in enumerate(res):
     
     if last_domain != domain:
         log_msg("It's a different domain from before, so searching %s (%d out of %d)\n\t%s vs %s" % (url[0], k+1, len(res), domain, last_domain))
+        time.sleep(.5)
     elif k > 0:
         log_msg("Being a good internet citizen and waiting for %d seconds before searching %s (%d out of %d)" % (per_call_delay, url[0], k+1, len(res)))
         for j in range(per_call_delay):
@@ -110,15 +119,18 @@ for k, url in enumerate(res):
     else:
         log_msg("Because it's the first, we are going to go ahead with  searching %s (%d out of %d)" % (url[0], k+1, len(res)))
     
-    http = httplib2.Http()
+    http = httplib2.Http(timeout=20)
     try:
         requests_made += 1
         status, response = http.request(url[0])
     except httplib.InvalidURL: 
         log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib.BadStatusLine: 
-        log_msg("Found a bad status line, not sure why this was grabbed as a link\n\t%s\n" % url[0])
+    except zlib.error: 
+        log_msg("zlib decompression error, not sure why this was grabbed as a link\n\t%s\n" % url[0])
+        status = None
+    except httplib2.RelativeURIError: 
+        log_msg("RelativeURIError, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
     except httplib2.SSLHandshakeError: 
         log_msg("SSL Issue with link:\n\t%s\n" % url[0])
@@ -141,6 +153,7 @@ for k, url in enumerate(res):
         
     mysql_conn, r = mysql_connect();  mysql_attempts = 0
     while mysql_conn is None and mysql_attempts < 10:
+        log_msg("Attempting to reconnect to MySQL in 15 sec...")
         time.sleep(15)
         mysql_conn, r = mysql_connect();  mysql_attempts += 1
     if mysql_conn is None:

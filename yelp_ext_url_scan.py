@@ -61,7 +61,7 @@ def log_msg(s, no_print=False):
     if not no_print:
         print(s)
     log = open(log_file, 'a')
-    log.write("%s\n" % s)
+    log.write("%s  %s\n" % (datetime.datetime.today().strftime("%H:%M:%S"),s))
     log.close()
     
 # Create a connection to the database
@@ -117,10 +117,11 @@ for k, url in enumerate(res):
             time.sleep(1)
     elif k == 10:
         break
-    http = httplib2.Http()
+    http = httplib2.Http(timeout=20)
     try:
         requests_made += 1
         status, response = http.request(url[0])
+        log_msg("Returned a response of length %d" % len(response), no_print=True)
     except httplib.InvalidURL: 
         log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None

@@ -106,7 +106,7 @@ def log_msg(s, no_print=False):
     if not no_print:
         print(s)
     log = open(log_file, 'a')
-    log.write("%s\n" % s)
+    log.write("%s  %s\n" % (datetime.datetime.today().strftime("%H:%M:%S"),s))
     log.close()
 
 data_campaign_ID = 3
@@ -123,7 +123,7 @@ cursor = mysql_conn.cursor()
 cursor.execute(query, param)
 r = cursor.fetchone()
 repo = r[0]
-print("Use the repository at %s" % repo)
+log_msg("Use the repository at %s" % repo)
 cursor.close(); mysql_conn.close()
 count_query = "SELECT count(1) from Yelp_Listings where active=1 and search_zip=%s"
 search_query = "SELECT count(1) from Yelp_Listings where active=1 and yelp_ID=%s and data_capture_campaign_ID=%s"

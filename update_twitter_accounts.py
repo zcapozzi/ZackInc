@@ -104,27 +104,46 @@ def log_msg(s, no_print=False):
     if not no_print:
         print(s)
     log = open(log_file, 'a')
-    log.write("%s\n" % s)
+    log.write("%s  %s\n" % (datetime.datetime.today().strftime("%H:%M:%S"),s))
     log.close()
 
 total_calls = 1.0
 
 for handle in res:
-    #print("%s" % handle[1])
+    
+    log_msg("Refreshing profile snapshot for %s" % handle[1])
     api = authenticate_me("zack")
     try:
         total_calls += 1
         tu = api.show_user(screen_name=handle[1])
-    except TwythonError as e:
-        log_msg("After making %d total calls" % total_calls)
-        log_msg("Error when reading %s" % handle[1])
-        log_msg("TwythonError: %s" % str(e))
-        sys.exit()
+    except TwythonAuthError as e:
+        if "Twitter API returned a 401 (Unauthorized)" in str(e):
+            log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+            log_msg("Error text: %s" % e)
+            handle = None
+            api = None
+        if "Twitter API returned a 403 (Forbidden), User has been suspended." in str(e):
+            log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for suspended handle: %s" % handle[1])
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+            log_msg("Error text: %s" % e)
+            handle = None
+            api = None
+        else:
+            log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+            log_msg("Error text: %s" % e)
+            handle = None
+            api = None
+            sys.exit()
+        
     log_msg("%s has %d followers..." % (handle[1], tu['followers_count']))
     
     api = None
-    #for k, v in zip(twitter_user.keys(), twitter_user.values()):
-    #    print("\tKey: %s\tValue: %s" % (k, v))
+
     
     mysql_conn, r = mysql_connect();  mysql_attempts = 0
     while mysql_conn is None and mysql_attempts < 10:
@@ -152,5 +171,6 @@ for handle in res:
     mysql_conn.commit(); 
     cursor.close(); mysql_conn.close()     
     
-    log_msg("Wait for 300 seconds...")
-    time.sleep(300)
+    per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/update_twitter_profile_parameters', 'r').read()).group(1))
+    log_msg("Wait for %d seconds..." % per_call_delay)
+    time.sleep(per_call_delay)

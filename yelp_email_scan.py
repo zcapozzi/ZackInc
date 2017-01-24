@@ -48,8 +48,6 @@ def mysql_connect():
         
     return cnx, response
 
-
-
 log_file = '/home/pi/zack/Logs/yelp_email_log_%s.txt' % (datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"))
 log_ = open(log_file, 'w')
 log_.close()
@@ -110,7 +108,8 @@ for k, url in enumerate(res2):
         domain = ''
     
     if last_domain != domain:
-        log_msg("It's a different domain from before, so searching %s (%d out of %d)\n\t%s vs %s" % (url[0], k+1, len(res), domain, last_domain))
+        #log_msg("It's a different domain from before, so searching %s (%d out of %d)\n\t%s vs %s" % (url[0], k+1, len(res), domain, last_domain))
+        log_msg("It's a different domain from before, so searching %s (%d out of %d)" % (url[0], k+1, len(res)))
         time.sleep(.5)
     elif k > 0:
         log_msg("Being a good internet citizen and waiting for %d seconds before searching %s (%d out of %d)" % (per_call_delay, url[0], k+1, len(res)))
@@ -123,6 +122,10 @@ for k, url in enumerate(res2):
     try:
         requests_made += 1
         status, response = http.request(url[0])
+        log_msg("Returned a response of length %d" % len(response), no_print=True)
+    except httplib.BadStatusLine: 
+        log_msg("Found a bad status line, not sure why this was grabbed as a link\n\t%s\n" % url[0])
+        status = None
     except httplib.InvalidURL: 
         log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
@@ -131,6 +134,9 @@ for k, url in enumerate(res2):
         status = None
     except httplib2.RelativeURIError: 
         log_msg("RelativeURIError, not sure why this was grabbed as a link\n\t%s\n" % url[0])
+        status = None
+    except httplib2.RedirectMissingLocation: 
+        log_msg("RedirectMissingLocation, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
     except httplib2.SSLHandshakeError: 
         log_msg("SSL Issue with link:\n\t%s\n" % url[0])
@@ -172,7 +178,7 @@ for k, url in enumerate(res2):
                 matches = re.findall(email_regex, response)
                 print("We found %d matches" % len(matches))
                 for m in matches:
-                    if not m.endswith(".png") and not m.endswith(".pdf") and not m.endswith(".bmp"):
+                    if not m.endswith(".png") and not m.endswith(".pdf") and not m.endswith(".bmp") and not m.endswith(".jpg"):
                         param = [m, url[2]]
                         log_msg("Query %s w\ %s" % (select_query, param), no_print = True)
                         cursor.execute(select_query, param)
@@ -189,7 +195,8 @@ for k, url in enumerate(res2):
             param = [url[0]]
             log_msg("Query %s w\ %s" % (update_query_found, param), no_print = True)
             cursor.execute(update_query_found, param)
-            
+             
+                
     else:
         param = [url[0]]
         log_msg("Query %s w\ %s" % (update_query_error, param))

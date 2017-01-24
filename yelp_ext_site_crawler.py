@@ -73,12 +73,16 @@ def get_links(url, layer, offset, parent, tag_type):
         #print("create http for %s" % url)
         log_msg("Create http for %s\n" % url, no_print=True)
         time.sleep(1)
-        http = httplib2.Http(timeout=20)
+        #http = httplib2.Http(timeout=3)
+        http = httplib2.Http()
         #print("make request")
         try:
             requests_made += 1
             status, response = http.request(url)
             log_msg("Returned a response of length %d" % len(response), no_print=True)
+        except httplib.BadStatusLine: 
+            log_msg("Found a bad status line, not sure why this was grabbed as a link\n\t%s\n" % url)
+            status = None
         except httplib.InvalidURL: 
             log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url)
             status = None
@@ -87,6 +91,9 @@ def get_links(url, layer, offset, parent, tag_type):
             status = None
         except httplib2.RelativeURIError: 
             log_msg("RelativeURIError, not sure why this was grabbed as a link\n\t%s\n" % url)
+            status = None
+        except httplib2.RedirectMissingLocation: 
+            log_msg("RedirectMissingLocation, not sure why this was grabbed as a link\n\t%s\n" % url)
             status = None
         except httplib2.SSLHandshakeError: 
             log_msg("SSL Issue with link:\n\t%s\n" % url)
@@ -113,64 +120,66 @@ def get_links(url, layer, offset, parent, tag_type):
                 if "text/html" in status['content-type'].lower():
                 
                     new_links_found = 0
-                    for i, link in enumerate(BeautifulSoup(response, parseOnlyThese=SoupStrainer('a'))):
-                    
-                        if link is not None:
+                    try:
+                        for i, link in enumerate(BeautifulSoup(response, parseOnlyThese=SoupStrainer('a'))):
                         
-                            if link.has_key("href"):
-                                
-                                if not link['href'].startswith("javascript") and not link['href'].startswith("mailto"):
-                                    if not link['href'].startswith("http"):
-                                        #print("Add prefix to %s" % link['href'])
-                                        m = domain_regex.search(url)
-                                        if m is not None:
-                                            #print(m.groups())
-                                            top_domain = "%s%s" % (m.group(1), m.group(3))
-                                            #print("\tAdd %s to %s to make %s" % (top_domain, link['href'], "%s%s" % (top_domain, link['href'])))
-                                            if top_domain.endswith("?") or top_domain.endswith("/") or link['href'].startswith("?") or link['href'].startswith("/"):
-                                                log_msg("\tAdd %s to %s to make %s\n" % (top_domain, link['href'], "%s%s" % (top_domain, link['href'])), no_print=True)
-                                                link_url = "%s%s" % (top_domain, link['href'])
-                                            else:
-                                                log_msg("\tAdd %s to '/' and %s to make %s\n" % (top_domain, link['href'], "%s%s" % (top_domain, link['href'])), no_print=True)
-                                                link_url = "%s/%s" % (top_domain, link['href'])
-                                            
-                                        else:
-                                            link_url = ""   
-                                    else:
-                                            link_url = link['href']
+                            if link is not None:
+                            
+                                if link.has_key("href"):
                                     
-                                    m = domain_regex.search(link_url)
-                                    link_domain = None
-                                    if m is not None:
-                                        link_domain = m.group(4)
-                                        #print("%s led to %s\n\t%s vs %s\n\n%s\n\n" % (url, link_url, url_domain, link_domain, m.groups()))
-                                        # Check if the domains match
-                                        domain_match = False
-                                        if link_domain is not None:
-                                            url_domain = url_domain.replace("www.", "")
-                                            link_domain = link_domain.replace("www.", "")
-                                            if url_domain in link_domain or link_domain in url_domain:
-                                                domain_match = True
-                                            #print("%s led to %s\n\t%s vs %s\n\n%s\n\n" % (url, link_url, url_domain, link_domain, m.groups()))
+                                    if not link['href'].startswith("javascript") and not link['href'].startswith("mailto"):
+                                        if not link['href'].startswith("http"):
+                                            #print("Add prefix to %s" % link['href'])
+                                            m = domain_regex.search(url)
+                                            if m is not None:
+                                                #print(m.groups())
+                                                top_domain = "%s%s" % (m.group(1), m.group(3))
+                                                #print("\tAdd %s to %s to make %s" % (top_domain, link['href'], "%s%s" % (top_domain, link['href'])))
+                                                if top_domain.endswith("?") or top_domain.endswith("/") or link['href'].startswith("?") or link['href'].startswith("/"):
+                                                    log_msg("\tAdd %s to %s to make %s\n" % (top_domain, link['href'], "%s%s" % (top_domain, link['href'])), no_print=True)
+                                                    link_url = "%s%s" % (top_domain, link['href'])
+                                                else:
+                                                    log_msg("\tAdd %s to '/' and %s to make %s\n" % (top_domain, link['href'], "%s%s" % (top_domain, link['href'])), no_print=True)
+                                                    link_url = "%s/%s" % (top_domain, link['href'])
                                                 
-                                            if link_url != "" and link_url != url  and new_links_found < 100 and domain_match:
-                                                if link_url.endswith("#"):
-                                                    log_msg("\t\tI have removed the trailing number sign from %s" % (link_url), no_print=True)
-                                                    link_url = link_url[0:-1]
-                                                if link_url not in all_links:
-                                                    log_msg("\tFound %s" % (link_url), no_print=True)
-                                                    all_links.append(link_url)
-                                                    if len(all_links) % 100 == 0 or (len(all_links) < 100 and len(all_links) % 25 == 0):
-                                                        log_msg("  %04d links found so far\t\t%04d requests already made..." % (len(all_links), requests_made))
-                                                    processed_links += 1
-                                                    new_links_found += 1
-                                                    if not link_url.endswith(".jpg") and not link_url.endswith(".png") and not link_url.endswith(".pdf"):
-                                                        get_links(link_url, layer+1, offset + ">>", url, 'a')
+                                            else:
+                                                link_url = ""   
+                                        else:
+                                                link_url = link['href']
+                                        
+                                        m = domain_regex.search(link_url)
+                                        link_domain = None
+                                        if m is not None:
+                                            link_domain = m.group(4)
+                                            #print("%s led to %s\n\t%s vs %s\n\n%s\n\n" % (url, link_url, url_domain, link_domain, m.groups()))
+                                            # Check if the domains match
+                                            domain_match = False
+                                            if link_domain is not None:
+                                                url_domain = url_domain.replace("www.", "")
+                                                link_domain = link_domain.replace("www.", "")
+                                                if url_domain in link_domain or link_domain in url_domain:
+                                                    domain_match = True
+                                                #print("%s led to %s\n\t%s vs %s\n\n%s\n\n" % (url, link_url, url_domain, link_domain, m.groups()))
+                                                    
+                                                if link_url != "" and link_url != url  and new_links_found < 100 and domain_match:
+                                                    if link_url.endswith("#"):
+                                                        log_msg("\t\tI have removed the trailing number sign from %s" % (link_url), no_print=True)
+                                                        link_url = link_url[0:-1]
+                                                    if link_url not in all_links:
+                                                        log_msg("\tFound %s" % (link_url), no_print=True)
+                                                        all_links.append(link_url)
+                                                        if len(all_links) % 100 == 0 or (len(all_links) < 100 and len(all_links) % 25 == 0):
+                                                            log_msg("  %04d links found so far\t\t%04d requests already made..." % (len(all_links), requests_made))
+                                                        processed_links += 1
+                                                        new_links_found += 1
+                                                        if not link_url.endswith(".jpg") and not link_url.endswith(".png") and not link_url.endswith(".pdf"):
+                                                            get_links(link_url, layer+1, offset + ">>", url, 'a')
+                                            else:
+                                                log_msg("\tNo domain found for %s" % (link_url))
                                         else:
                                             log_msg("\tNo domain found for %s" % (link_url))
-                                    else:
-                                        log_msg("\tNo domain found for %s" % (link_url))
-                            
+                    except TypeError:
+                        log_msg("\tType Error when parsing %s" % (link_url))   
     content_type = ''
     if not url.startswith("http"):
         #print("Add prefix to %s" % link['href'])
@@ -206,7 +215,7 @@ def log_msg(s, no_print=False):
     if not no_print:
         print(s)
     log = open(log_file, 'a')
-    log.write("%s  %s\n" % (datetime.datetime.today().strftime("%H:%M:%S"), s)
+    log.write("%s  %s\n" % (datetime.datetime.today().strftime("%H:%M:%S"), s))
     log.close()
     
 # Create a connection to the database
@@ -254,7 +263,7 @@ for site in sites:
         mysql_conn, r = mysql_connect();  mysql_attempts += 1
     if mysql_conn is None:
         log_msg("Could not connect to MySQL after 10 tries...exiting.")
-        sys.exit()
+
     cursor = mysql_conn.cursor()
     mysql_conn.set_character_set('utf8')
     cursor = mysql_conn.cursor()

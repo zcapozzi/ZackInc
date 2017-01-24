@@ -11,7 +11,7 @@ reload(sys)
 sys.setdefaultencoding("utf-8")
 
 from twython import Twython
-from twython import TwythonAuthError
+from twython import TwythonAuthError, TwythonError
 
 import errno
 from socket import error as socket_error
@@ -85,7 +85,7 @@ def authenticate_me(whoami):
     else:
         return None
     return Twython(CONSUMER_KEY, CONSUMER_SECRET, ACCESS_KEY, ACCESS_SECRET)
-    
+current_milli_time = lambda: int(round(time.time() * 1000))    
 # Create a connection to the database
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 
@@ -96,7 +96,6 @@ cursor.close(); mysql_conn.close()
 
 date_regex = re.compile(r'[A-Za-z]{3}\s([A-Za-z]{3})\s([0-9]{2})\s([0-9]{2})\:([0-9]{2})\:([0-9]{2})\s\+[0-9]{4}\s([0-9]{4})')
 header = ""
-
 log_file = '/home/pi/zack/Logs/update_twitter_accounts_log_%s.txt' % (datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"))
 log_ = open(log_file, 'w')
 log_.close()
@@ -108,7 +107,7 @@ def log_msg(s, no_print=False):
     log.close()
 
 total_calls = 1.0
-
+start_ms = current_milli_time()
 for handle in res:
     
     log_msg("Refreshing profile snapshot for %s" % handle[1])
@@ -124,7 +123,7 @@ for handle in res:
             log_msg("Error text: %s" % e)
             handle = None
             api = None
-        if "Twitter API returned a 403 (Forbidden), User has been suspended." in str(e):
+        elif "Twitter API returned a 403 (Forbidden), User has been suspended." in str(e):
             log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for suspended handle: %s" % handle[1])
             log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
             log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
@@ -138,13 +137,30 @@ for handle in res:
             log_msg("Error text: %s" % e)
             handle = None
             api = None
+    except TwythonError as e:
+        if "Twitter API returned a 401 (Unauthorized)" in str(e):
+            log_msg("1) TwythonError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+            log_msg("Error text: %s" % e)
+            handle = None
+            api = None
+        elif "Twitter API returned a 403 (Forbidden), User has been suspended." in str(e):
+            log_msg("1) TwythonError Error occurred when trying to capture the tweets for suspended handle: %s" % handle[1])
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+            log_msg("Error text: %s" % e)
+            handle = None
+            api = None
+        else:
+            log_msg("1) TwythonError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+            log_msg("Error text: %s" % e)
+            handle = None
+            api = None
             sys.exit()
-        
-    log_msg("%s has %d followers..." % (handle[1], tu['followers_count']))
-    
     api = None
-
-    
     mysql_conn, r = mysql_connect();  mysql_attempts = 0
     while mysql_conn is None and mysql_attempts < 10:
         time.sleep(15)
@@ -152,21 +168,28 @@ for handle in res:
     if mysql_conn is None:
         log_msg("Could not connect to MySQL after 10 tries...exiting.")
         sys.exit()
-    cursor = mysql_conn.cursor()
-    query = "UPDATE Twitter_Account_Snapshot set most_recent=0 where twitter_account_ID=%s"
-    param = [handle[0]]
-    cursor.execute(query, param)
     
-    query = "INSERT INTO Twitter_Account_Snapshot (datestamp, twitter_account_ID, twitter_handle, num_followers, verified, twitter_name, num_tweets, num_following, url, most_recent)"
-    query += " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 1)"
-    param = [datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"), handle[0], handle[1], tu['followers_count'], 1 if tu['verified'] else 0, tu['name'], tu['statuses_count'], tu['friends_count'], tu['url']]
-    cursor.execute(query, param)
-    log_msg("Query %s w/ %s" % (query, param))
-    query = "UPDATE Twitter_Accounts set name=%s where ID=%s"
-    param = [tu['name'], handle[0]]
-    cursor.execute(query, param)
-    log_msg("Query %s w/ %s" % (query, param))
-    tu = None
+    if handle is not None:
+        log_msg("%s has %d followers..." % (handle[1], tu['followers_count']))
+    
+    
+
+    
+        cursor = mysql_conn.cursor()
+        query = "UPDATE Twitter_Account_Snapshot set most_recent=0 where twitter_account_ID=%s"
+        param = [handle[0]]
+        cursor.execute(query, param)
+        
+        query = "INSERT INTO Twitter_Account_Snapshot (datestamp, twitter_account_ID, twitter_handle, num_followers, verified, twitter_name, num_tweets, num_following, url, most_recent)"
+        query += " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 1)"
+        param = [datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"), handle[0], handle[1], tu['followers_count'], 1 if tu['verified'] else 0, tu['name'], tu['statuses_count'], tu['friends_count'], tu['url']]
+        cursor.execute(query, param)
+        log_msg("Query %s w/ %s" % (query, param))
+        query = "UPDATE Twitter_Accounts set name=%s where ID=%s"
+        param = [tu['name'], handle[0]]
+        cursor.execute(query, param)
+        log_msg("Query %s w/ %s" % (query, param))
+        tu = None
     
     mysql_conn.commit(); 
     cursor.close(); mysql_conn.close()     

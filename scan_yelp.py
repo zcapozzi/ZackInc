@@ -118,7 +118,7 @@ while mysql_conn is None and mysql_attempts < 10:
     mysql_conn, r = mysql_connect();  mysql_attempts += 1
 if mysql_conn is None:
     log_msg("Could not connect to MySQL after 10 tries...exiting.")
-    sys.exit()
+
 cursor = mysql_conn.cursor()
 cursor.execute(query, param)
 r = cursor.fetchone()
@@ -141,7 +141,7 @@ for z_count, zip_code in enumerate(zips):
             mysql_conn, r = mysql_connect();  mysql_attempts += 1
         if mysql_conn is None:
             log_msg("Could not connect to MySQL after 10 tries...exiting.")
-            sys.exit()
+
         cursor = mysql_conn.cursor()
         cursor.execute(count_query, count_param)
         r = cursor.fetchone()
@@ -162,6 +162,14 @@ for z_count, zip_code in enumerate(zips):
                 f = open(os.path.join(repo, "auto_yelp_zip_code_%s.txt" % zip_code), 'w')
                 f.write("\tReturned %d businesses\n" % (s2.total + s.total))
                 f.close()
+            except yelp.errors.InternalError:
+                s = None
+                print("\t500 Internal Server error for location: %s (%s)" % (zip_code, e))
+                
+            except ValueError:
+                s = None
+                print("\tValue Error error for location: %s (%s)" % (zip_code, e))
+                
             except yelp.errors.UnavailableForLocation:
                 s = None
                 print("\tNo API access for location: %s" % (zip_code))
@@ -185,7 +193,6 @@ for z_count, zip_code in enumerate(zips):
                             else:
                                 log_msg("Unknown MySQL error...  %s (e5kpqcb)" % e)
                                 cursor.execute(search_query, search_param)
-                                sys.exit()
                     r = cursor.fetchone()
                     if int(r[0]) == 0:
                         #print("\t\tExecute %s w/ %s" % (insert_query, insert_param))

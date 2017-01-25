@@ -61,7 +61,7 @@ def log_msg(s, no_print=False):
 # Create a connection to the database
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 
-query  = "SELECT a.url, b.ID, c.ID, a.yelp_listing_ID from Data_Capture_Links a, Data_Capture_Campaigns b, Email_Scrapes c where "
+query  = "SELECT a.url, b.ID, c.ID, a.yelp_listing_ID, a.time_stored, a.capture_sequence from Data_Capture_Links a, Data_Capture_Campaigns b, Email_Scrapes c where "
 query += "c.active=1 and c.complete = 0 and a.scanned_for_emails=0 and ISNULL(crawl_errors) and IFNULL(a.content_type, '')='' and "
 query += "c.data_capture_campaign_ID=a.data_capture_campaign_ID and  b.ID=a.data_capture_campaign_ID"
 cursor.execute(query)
@@ -86,8 +86,8 @@ email_regex = re.compile(r'([\(\)a-z0-9\_\-]+@[a-z0-9\_\-\(\)]+\.[a-z0-9\_\-\(\)
 requests_made = 0.0
 
 
-update_query_error = "UPDATE Data_Capture_Links set crawl_errors = IFNULL(crawl_errors, 0)+1 where url=%s"
-update_query_found = "UPDATE Data_Capture_Links set scanned_for_emails=1 where url=%s"
+update_query_error = "UPDATE Data_Capture_Links set crawl_errors = IFNULL(crawl_errors, 0)+1 where time_stored=%s and capture_sequence=%s"
+update_query_found = "UPDATE Data_Capture_Links set scanned_for_emails=1 where time_stored=%s and capture_sequence=%s"
 select_query = "Select count(1) from Emails where email_address=%s and email_scrape_ID=%s"
 insert_query = "INSERT INTO Emails (company_ID, person_ID, email_address, email_domain, active, total_emails, last_send, total_responses, removed, usercode, email_scrape_ID, found_on, source_url, yelp_listing_ID) VALUES (-1, -1, %s, '', 1, 0, '1900-01-01 01:00:00', 0, 0, '', %s, %s, %s, %s)"
 per_call_delay = 30
@@ -192,13 +192,13 @@ for k, url in enumerate(res2):
                             print("\t%s has already been stored" % m)
                         
         if len(response) > 0:
-            param = [url[0]]
+            param = [url[4], url[5]]
             log_msg("Query %s w\ %s" % (update_query_found, param), no_print = True)
             cursor.execute(update_query_found, param)
              
                 
     else:
-        param = [url[0]]
+        param = [url[4], url[5]]
         log_msg("Query %s w\ %s" % (update_query_error, param))
         cursor.execute(update_query_error, param)
     if True:
@@ -207,3 +207,4 @@ for k, url in enumerate(res2):
         print("\n\nReminder, nothing is being committed!!!!\n")
     cursor.close(); mysql_conn.close()     
     last_domain = domain
+log_msg("DONE!!!")

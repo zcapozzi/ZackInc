@@ -124,29 +124,49 @@ cursor.execute(query, param)
 r = cursor.fetchone()
 repo = r[0]
 log_msg("Use the repository at %s" % repo)
+group_by_query = "SELECT search_zip, count(1) from Yelp_Listings where active=1 group by search_zip"
+cursor.execute(group_by_query)
+count_by_zips = cursor.fetchall()
+gb_zips = []
+gb_counts = []
+log_msg("Creating list of listings by zip from db...")
+for c in count_by_zips:
+	gb_zips.append(c[0])
+	gb_counts.append(c[1])
+
 cursor.close(); mysql_conn.close()
 count_query = "SELECT count(1) from Yelp_Listings where active=1 and search_zip=%s"
 search_query = "SELECT count(1) from Yelp_Listings where active=1 and yelp_ID=%s and data_capture_campaign_ID=%s"
 insert_query = "INSERT INTO Yelp_Listings (time_captured, search_zip, yelp_ID, data_capture_campaign_ID, yelp_name, yelp_url, external_url, yelp_category, yelp_phone, is_closed, yelp_city, yelp_state, yelp_zip, country_code, manually_scanned, scanned_ext_for_emails, active) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 
+log_msg("Adding zips with no listings...")
+for z_count, z in enumerate(zips):
+	if z_count % 10000 == 0:
+		log_msg("Processing %d / %d" % (z_count, len(zips)))
+	if z not in gb_zips:
+		gb_zips.append(z)
+		gb_counts.append(0)
+
+log_msg("Start processing zip codes...")
 for z_count, zip_code in enumerate(zips):
-    per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/scan_yelp_parameters', 'r').read()).group(1))
 
     if zip_code != "00000":
-        count_param = [zip_code]
+        #	 count_param = [zip_code]
         
-        mysql_conn, r = mysql_connect();  mysql_attempts = 0
-        while mysql_conn is None and mysql_attempts < 10:
-            time.sleep(15)
-            mysql_conn, r = mysql_connect();  mysql_attempts += 1
-        if mysql_conn is None:
-            log_msg("Could not connect to MySQL after 10 tries...exiting.")
-
-        cursor = mysql_conn.cursor()
-        cursor.execute(count_query, count_param)
-        r = cursor.fetchone()
+	#        cursor.execute(count_query, count_param)
+	#        r = cursor.fetchone()
         file_exists = os.path.isfile(os.path.join(repo, "auto_yelp_zip_code_%s.txt" % zip_code))
-        if int(r[0]) == 0 and not file_exists:
+        if gb_counts[gb_zips.index(zip_code)] == 0 and not file_exists:
+    	    per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/scan_yelp_parameters', 'r').read()).group(1))
+
+	    mysql_conn, r = mysql_connect();  mysql_attempts = 0
+	    while mysql_conn is None and mysql_attempts < 10:
+	            time.sleep(15)
+	            mysql_conn, r = mysql_connect();  mysql_attempts += 1
+	    if mysql_conn is None:
+            	log_msg("Could not connect to MySQL after 10 tries...exiting.")
+
+	    cursor = mysql_conn.cursor()
             cursor.execute("SET collation_connection='utf8_general_ci'")
             cursor.execute("ALTER DATABASE monoprice CHARACTER SET utf8 COLLATE utf8_general_ci")
             cursor.execute("ALTER TABLE Yelp_Listings CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci")
@@ -216,5 +236,5 @@ for z_count, zip_code in enumerate(zips):
                         print("\t\tAlready stored in the DB...")
                         
                 print("Added %d new listing(s)..." % new_listings)
-        cursor.close(); mysql_conn.close()
+	        cursor.close(); mysql_conn.close()
         

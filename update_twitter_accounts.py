@@ -197,3 +197,4 @@ for handle in res:
     per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/update_twitter_profile_parameters', 'r').read()).group(1))
     log_msg("Wait for %d seconds..." % per_call_delay)
     time.sleep(per_call_delay)
+log_msg("DONE!!!")

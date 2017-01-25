@@ -179,7 +179,7 @@ def get_links(url, layer, offset, parent, tag_type):
                                         else:
                                             log_msg("\tNo domain found for %s" % (link_url))
                     except TypeError:
-                        log_msg("\tType Error when parsing %s" % (link_url))   
+                        log_msg("\tType Error when parsing %s" % (url))   
     content_type = ''
     if not url.startswith("http"):
         #print("Add prefix to %s" % link['href'])
@@ -302,4 +302,4 @@ for site in sites:
         print("\n\n\tReminder, results were not committed to the DB!!!!\n\n")
     cursor.close()
     mysql_conn.close()
-log_msg("\n\n  DONE!!!")
+log_msg("\n\nDONE!!!")

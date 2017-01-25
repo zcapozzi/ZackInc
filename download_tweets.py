@@ -11,7 +11,7 @@ reload(sys)
 sys.setdefaultencoding("utf-8")
 
 from twython import Twython
-from twython import TwythonAuthError
+from twython import TwythonAuthError, TwythonError
 
 import errno
 from socket import error as socket_error
@@ -143,6 +143,15 @@ for handle in res:
             time.sleep(1)
     except IndexError as e:
         handle = None
+    except TwythonError as e:
+        log_msg("1) TwythonError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+        log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+        log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+        log_msg("Error text: %s" % e)
+        handle = None
+        api = None
+        
+        
     except TwythonAuthError as e:
         if "Twitter API returned a 401 (Unauthorized)" in str(e):
             log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
@@ -172,14 +181,31 @@ for handle in res:
                 total_calls+= 1.0; user_timeline = api.get_user_timeline(screen_name=handle[1], count=200, include_retweets=True, max_id=points[-1])
                 log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
             except TwythonAuthError as e:
-                log_msg("2) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+                if "Twitter API returned a 401 (Unauthorized)" in str(e):
+                    log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+                    log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+                    log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+                    log_msg("Error text: %s" % e)
+                    handle = None
+                    api = None
+                else:
+                    log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+                    log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+                    log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+                    log_msg("Error text: %s" % e)
+                    handle = None
+                    api = None
+                    sys.exit()
+            except TwythonError as e:
+                log_msg("1) TwythonError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
                 log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
                 log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
                 log_msg("Error text: %s" % e)
                 handle = None
                 api = None
-                sys.exit()
-            
+        
+        
+    
             api = None
             mysql_conn, r = mysql_connect();  mysql_attempts = 0
             while mysql_conn is None and mysql_attempts < 10:
@@ -309,3 +335,4 @@ query = "INSERT INTO Twitter_Pull_Sessions (start_time, end_time, accounts_scann
 param = [session_start_time, session_end_time, session_accounts_scanned, session_total_tweets_found, session_total_new_tweets, scan_auto_sourced_accounts]
 cursor.execute(query, param)
 mysql_conn.commit(); cursor.close(); mysql_conn.close() 
+log_msg("DONE!!!")

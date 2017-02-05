@@ -14,7 +14,27 @@ from socket import error as socket_error
 import ssl
 from subprocess import Popen, PIPE
 
+import telegram
+
 import zlib
+
+bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
+
+def setup_telegram():
+    # Connect to our bot
+    bot = telegram.Bot(token=bot_token)
+
+    # Waits for the first incoming message
+    updates=[]
+    while not updates:
+        updates = bot.getUpdates()
+        
+    # Gets the id for the active chat
+    #print updates[-1].message.text
+    chat_id=updates[-1].message.chat_id
+
+
+    return bot, chat_id
 
 def mysql_connect():
     cnx = None
@@ -68,13 +88,13 @@ def get_links(url, layer, offset, parent, tag_type):
     if m is not None:
         url_domain = m.group(4)
         
-    if layer <= layer_limit and len(all_links) < 500:
+    
+    if layer <= layer_limit and len(all_links) < 500 and "lepainquotidien" not in url and "aubonpain" not in url and "nothingbundtcakes" not in url:
         processed_links = 0
         #print("create http for %s" % url)
         log_msg("Create http for %s\n" % url, no_print=True)
         time.sleep(1)
-        #http = httplib2.Http(timeout=3)
-        http = httplib2.Http()
+        http = httplib2.Http(timeout=20)
         #print("make request")
         try:
             requests_made += 1
@@ -82,6 +102,9 @@ def get_links(url, layer, offset, parent, tag_type):
             log_msg("Returned a response of length %d" % len(response), no_print=True)
         except httplib.BadStatusLine: 
             log_msg("Found a bad status line, not sure why this was grabbed as a link\n\t%s\n" % url)
+            status = None
+        except httplib.IncompleteRead: 
+            log_msg("IncompleteRead error, not sure why this was grabbed as a link\n\t%s\n" % url)
             status = None
         except httplib.InvalidURL: 
             log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url)
@@ -91,6 +114,9 @@ def get_links(url, layer, offset, parent, tag_type):
             status = None
         except httplib2.RelativeURIError: 
             log_msg("RelativeURIError, not sure why this was grabbed as a link\n\t%s\n" % url)
+            status = None
+        except httplib2.FailedToDecompressContent: 
+            log_msg("FailedToDecompressContent, not sure why this was grabbed as a link\n\t%s\n" % url)
             status = None
         except httplib2.RedirectMissingLocation: 
             log_msg("RedirectMissingLocation, not sure why this was grabbed as a link\n\t%s\n" % url)
@@ -207,6 +233,13 @@ def get_links(url, layer, offset, parent, tag_type):
     if d not in all_links_detail:
         all_links_detail.append(d)
 
+weekday = datetime.datetime.today().weekday()
+hr_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6)).hour) / 8)
+
+# 3 8-hr periods
+# 6 A - 2 P
+# 2 P - 10P
+# 10P - 6 A
 
 log_file = '/home/pi/zack/Logs/yelp_ext_site_crawler_log_%s.txt' % (datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"))
 log_ = open(log_file, 'w')
@@ -302,4 +335,14 @@ for site in sites:
         print("\n\n\tReminder, results were not committed to the DB!!!!\n\n")
     cursor.close()
     mysql_conn.close()
+    
+    coming_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6) + datetime.timedelta(minutes=5)).hour) / 8)
+    if hr_period != coming_period:
+        log_msg("End of session at %s" % (datetime.datetime.today().strftime("%H:%M:%S")))
+        
+        bot, chat_id = setup_telegram()
+        msg = "End of yelp_ext_site_crawler session at %s" % (datetime.datetime.today().strftime("%H:%M:%S"))
+        bot.sendMessage(chat_id=chat_id, text=msg)
+        log_msg("Done!!!")
+        sys.exit()
 log_msg("\n\nDONE!!!")

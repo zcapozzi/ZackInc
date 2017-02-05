@@ -16,6 +16,24 @@ from subprocess import Popen, PIPE
 
 import clipboard
 
+bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
+
+def setup_telegram():
+    # Connect to our bot
+    bot = telegram.Bot(token=bot_token)
+
+    # Waits for the first incoming message
+    updates=[]
+    while not updates:
+        updates = bot.getUpdates()
+        
+    # Gets the id for the active chat
+    #print updates[-1].message.text
+    chat_id=updates[-1].message.chat_id
+
+
+    return bot, chat_id
+    
 def mysql_connect():
     cnx = None
     try:
@@ -48,7 +66,8 @@ def mysql_connect():
         
     return cnx, response
 
-
+weekday = datetime.datetime.today().weekday()
+hr_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6)).hour) / 8)
 
 def keypress(sequence):
     p = Popen(['xte'], stdin=PIPE)
@@ -108,11 +127,14 @@ update_query_found = "UPDATE Yelp_Listings set external_url=%s, manually_scanned
 update_query_not_found = "UPDATE Yelp_Listings set manually_scanned = 1 where yelp_ID=%s"
 
 
+cnt_link_not_found = 0
+cnt_link_found = 0
+consec_no_link = 0
 
 for k, url in enumerate(res):
     per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/yelp_ext_url_scan_parameters', 'r').read()).group(1))
     if k > 0:
-        log_msg("Being a good internet citizen and waiting for %d seconds before searching %s (%d out of %d)" % (per_call_delay, url[0], k+1, len(res)))
+        log_msg("Being a good internet citizen and waiting for %d seconds before searching url %d out of %d" % (per_call_delay, k+1, len(res)))
         for j in range(per_call_delay):
             time.sleep(1)
     elif k == 10:
@@ -129,7 +151,7 @@ for k, url in enumerate(res):
         log_msg("SSL Issue with link:\n\t%s\n" % url[0])
         status = None
     except httplib2.ServerNotFoundError: 
-        log_msg("ServerNotFound Error with link:\n\t%s\n" % url)[0]
+        log_msg("ServerNotFound Error with link:\n\t%s\n" % url[0])
         status = None
     except ssl.SSLEOFError: 
         log_msg("SSL Issue with link:\n\t%s\n" % url[0])
@@ -171,19 +193,39 @@ for k, url in enumerate(res):
                         if m is not None:
                             link = m.group(1)
                             link = link.replace("%3A", ":").replace("%2F", "/")
-                            log_msg("Found a link: %s" % link)
+                            log_msg("\tFound a link: %s" % link)
                             param = [link, url[1]]
                             #print("Query %s w/ %s" % (update_query_found, param))
                             cursor.execute(update_query_found, param)
                             found = True
                             break
+                log_msg("Finished read of %s" % url[0], no_print=True)
                 if not found:
                     param = [url[1]]
-                    log_msg("No link found...")
+                    log_msg("\tNo link found...")
                     #print("Query %s w/ %s" % (update_query_not_found, param))
                     cursor.execute(update_query_not_found, param)
+                    cnt_link_not_found += 1
+                    consec_no_link += 1
+                    if consec_no_link == 50:
+                        log_msg("\n\n\t50 consecutive links didn't have an external URL; that's fishy, we're exiting")
+                        sys.exit()
+                else:
+                    cnt_link_found += 1
+                    consec_no_link = 0
                 if True:
                     mysql_conn.commit(); 
                 else:
                     print("Reminder: nothing is being committed right now.")
                 cursor.close(); mysql_conn.close()     
+                log_msg("\t\t%s link(s) processed  --  %s with links  -- %s without links...\n----------------------------------------------" % ("{:,}".format(cnt_link_found + cnt_link_not_found), "{:,}".format(cnt_link_found), "{:,}".format(cnt_link_not_found)))
+    coming_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6) + datetime.timedelta(minutes=2)).hour) / 8)
+    if hr_period != coming_period:
+        log_msg("End of session at %s" % (datetime.datetime.today().strftime("%H:%M:%S")))
+        
+        bot, chat_id = setup_telegram()
+        msg = "End of yelp_ext_url_scan session at %s" % (datetime.datetime.today().strftime("%H:%M:%S"))
+        bot.sendMessage(chat_id=chat_id, text=msg)
+        log_msg("Done!!!")
+        sys.exit()   
+log_msg("Done!!!")

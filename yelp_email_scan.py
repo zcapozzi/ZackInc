@@ -16,6 +16,24 @@ from subprocess import Popen, PIPE
 
 from random import shuffle
 
+bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
+
+def setup_telegram():
+    # Connect to our bot
+    bot = telegram.Bot(token=bot_token)
+
+    # Waits for the first incoming message
+    updates=[]
+    while not updates:
+        updates = bot.getUpdates()
+        
+    # Gets the id for the active chat
+    #print updates[-1].message.text
+    chat_id=updates[-1].message.chat_id
+
+
+    return bot, chat_id
+
 def mysql_connect():
     cnx = None
     try:
@@ -85,6 +103,8 @@ first_call = True
 email_regex = re.compile(r'([\(\)a-z0-9\_\-]+@[a-z0-9\_\-\(\)]+\.[a-z0-9\_\-\(\)]+)', re.IGNORECASE)
 requests_made = 0.0
 
+weekday = datetime.datetime.today().weekday()
+hr_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6)).hour) / 8)
 
 update_query_error = "UPDATE Data_Capture_Links set crawl_errors = IFNULL(crawl_errors, 0)+1 where time_stored=%s and capture_sequence=%s"
 update_query_found = "UPDATE Data_Capture_Links set scanned_for_emails=1 where time_stored=%s and capture_sequence=%s"
@@ -107,17 +127,19 @@ for k, url in enumerate(res2):
     else:
         domain = ''
     
+    log_msg("%s out of %s" % ("{:,}".format(k+1), "{:,}".format(len(res))))
     if last_domain != domain:
         #log_msg("It's a different domain from before, so searching %s (%d out of %d)\n\t%s vs %s" % (url[0], k+1, len(res), domain, last_domain))
-        log_msg("It's a different domain from before, so searching %s (%d out of %d)" % (url[0], k+1, len(res)))
-        time.sleep(.5)
+        #log_msg("\tIt's a different domain from before, so searching %s (%d out of %d)" % (url[0], k+1, len(res)))
+        time.sleep(.3)
     elif k > 0:
-        log_msg("Being a good internet citizen and waiting for %d seconds before searching %s (%d out of %d)" % (per_call_delay, url[0], k+1, len(res)))
+        log_msg("\tBeing a good internet citizen and waiting for %d seconds before searching %s (%d out of %d)" % (per_call_delay, url[0], k+1, len(res)))
         for j in range(per_call_delay):
             time.sleep(1)
     else:
-        log_msg("Because it's the first, we are going to go ahead with  searching %s (%d out of %d)" % (url[0], k+1, len(res)))
+        log_msg("\tBecause it's the first, we are going to go ahead with  searching %s (%d out of %d)" % (url[0], k+1, len(res)))
     
+    start_ms = current_milli_time()
     http = httplib2.Http(timeout=20)
     try:
         requests_made += 1
@@ -126,11 +148,17 @@ for k, url in enumerate(res2):
     except httplib.BadStatusLine: 
         log_msg("Found a bad status line, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
+    except httplib.IncompleteRead: 
+        log_msg("Incomplete read, not sure why this was grabbed as a link\n\t%s\n" % url[0])
+        status = None
     except httplib.InvalidURL: 
         log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
     except zlib.error: 
         log_msg("zlib decompression error, not sure why this was grabbed as a link\n\t%s\n" % url[0])
+        status = None
+    except httplib2.FailedToDecompressContent: 
+        log_msg("httplib2.FailedToDecompressContent error, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
     except httplib2.RelativeURIError: 
         log_msg("RelativeURIError, not sure why this was grabbed as a link\n\t%s\n" % url[0])
@@ -156,7 +184,9 @@ for k, url in enumerate(res2):
     except httplib2.RedirectLimit:
         log_msg("RedirectLimit with link:\n\t%s\n" % url[0])
         status = None
-        
+    end_ms = current_milli_time()
+    print("\tConnecting to site took %s ms" % "{:,}".format(end_ms - start_ms))
+    start_ms = current_milli_time()
     mysql_conn, r = mysql_connect();  mysql_attempts = 0
     while mysql_conn is None and mysql_attempts < 10:
         log_msg("Attempting to reconnect to MySQL in 15 sec...")
@@ -166,6 +196,8 @@ for k, url in enumerate(res2):
         log_msg("Could not connect to MySQL after 10 tries...exiting.")
         sys.exit()
     cursor = mysql_conn.cursor()
+    end_ms = current_milli_time()
+    print("\tConnecting to MySQL DB took %d ms" % (end_ms - start_ms))
     if status is not None:
         log_msg("Status: %s" % status, no_print = True)
         
@@ -173,23 +205,21 @@ for k, url in enumerate(res2):
             
             if "text/html" in status['content-type'].lower():
             
-                
-                #print(response)
                 matches = re.findall(email_regex, response)
-                print("We found %d matches" % len(matches))
-                for m in matches:
-                    if not m.endswith(".png") and not m.endswith(".pdf") and not m.endswith(".bmp") and not m.endswith(".jpg"):
-                        param = [m, url[2]]
-                        log_msg("Query %s w\ %s" % (select_query, param), no_print = True)
-                        cursor.execute(select_query, param)
-                        r = cursor.fetchone()
-                        if r[0] == 0:
-                            print("\t store %s" % m)
-                            param = [m, url[2], datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"), url[0], url[3]]
-                            log_msg("Query %s w\ %s" % (insert_query, param), no_print = True)
-                            cursor.execute(insert_query, param)
-                        else:
-                            print("\t%s has already been stored" % m)
+                if len(matches) > 0:
+                    log_msg("\tWe found %d matches" % len(matches), no_print = True)
+                    for m in matches:
+                        if not m.endswith(".png") and not m.endswith(".pdf") and not m.endswith(".bmp") and not m.endswith(".jpg"):
+                            param = [m, url[2]]
+                            log_msg("Query %s w\ %s" % (select_query, param), no_print = True)
+                            cursor.execute(select_query, param)
+                            r = cursor.fetchone()
+                            if r[0] == 0:
+                                log_msg("\t\tstore %s" % m)
+                                param = [m, url[2], datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"), url[0], url[3]]
+                                log_msg("Query %s w\ %s" % (insert_query, param), no_print = True)
+                                cursor.execute(insert_query, param)
+                            
                         
         if len(response) > 0:
             param = [url[4], url[5]]
@@ -199,7 +229,7 @@ for k, url in enumerate(res2):
                 
     else:
         param = [url[4], url[5]]
-        log_msg("Query %s w\ %s" % (update_query_error, param))
+        log_msg("Query %s w\ %s" % (update_query_error, param), no_print = True)
         cursor.execute(update_query_error, param)
     if True:
         mysql_conn.commit()
@@ -207,4 +237,13 @@ for k, url in enumerate(res2):
         print("\n\nReminder, nothing is being committed!!!!\n")
     cursor.close(); mysql_conn.close()     
     last_domain = domain
+    coming_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6) + datetime.timedelta(minutes=10)).hour) / 8)
+    if hr_period != coming_period:
+        log_msg("End of session at %s" % (datetime.datetime.today().strftime("%H:%M:%S")))
+        
+        #bot, chat_id = setup_telegram()
+        #msg = "End of yelp_email_scan session at %s" % (datetime.datetime.today().strftime("%H:%M:%S"))
+        #bot.sendMessage(chat_id=chat_id, text=msg)
+        log_msg("Done!!!")
+        sys.exit()
 log_msg("DONE!!!")

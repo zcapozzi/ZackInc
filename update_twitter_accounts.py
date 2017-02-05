@@ -108,7 +108,14 @@ def log_msg(s, no_print=False):
 
 total_calls = 1.0
 start_ms = current_milli_time()
+
+weekday = datetime.datetime.today().weekday()
+hr_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6)).hour) / 8)
+
+# 3 8-hr periods
+
 for handle in res:
+    
     
     log_msg("Refreshing profile snapshot for %s" % handle[1])
     api = authenticate_me("zack")
@@ -197,4 +204,9 @@ for handle in res:
     per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/update_twitter_profile_parameters', 'r').read()).group(1))
     log_msg("Wait for %d seconds..." % per_call_delay)
     time.sleep(per_call_delay)
+    coming_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6) + datetime.timedelta(minutes=10)).hour) / 8)
+    if hr_period != coming_period:
+        log_msg("End of session at %s" % (datetime.datetime.today().strftime("%H:%M:%S")))
+        break
+    
 log_msg("DONE!!!")

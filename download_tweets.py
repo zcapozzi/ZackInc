@@ -20,6 +20,8 @@ from subprocess import Popen, PIPE
 
 import clipboard
 
+bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
+
 def mysql_connect():
     cnx = None
     try:
@@ -125,7 +127,6 @@ for handle in res:
     session_accounts_scanned += 1
     api = authenticate_me("zack")
     try:
-    #if True:
         if not first_call:
             log_msg("Wait for %d." % (per_call_delay/2))
             for i in range(per_call_delay/2):
@@ -197,16 +198,109 @@ for handle in res:
                     api = None
                     sys.exit()
             except TwythonError as e:
-                log_msg("1) TwythonError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
-                log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
-                log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
-                log_msg("Error text: %s" % e)
-                handle = None
-                api = None
+                if "Twitter API returned a 503 (Service Unavailable), Over capacity" in str(e):
+                    log_msg("1) TwythonError Error (503 (Service Unavailable), Over capacity) occurred when trying to capture the tweets for handle: %s" % handle[1])
+                    log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+                    log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+                    log_msg("Error text: %s" % e)
+                    handle = None
+                    api = None
+                    time.sleep(600)
         
+                else:    
+                    log_msg("1) TwythonError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+                    log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+                    log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+                    log_msg("Error text: %s" % e)
+                    handle = None
+                    api = None
         
-    
             api = None
+            if handle is not None:
+            
+            
+                mysql_conn, r = mysql_connect();  mysql_attempts = 0
+                while mysql_conn is None and mysql_attempts < 10:
+                    time.sleep(15)
+                    mysql_conn, r = mysql_connect();  mysql_attempts += 1
+                if mysql_conn is None:
+                    log_msg("Could not connect to MySQL after 10 tries...exiting.")
+                    sys.exit()
+                cursor = mysql_conn.cursor()
+                cursor.execute('SET NAMES utf8mb4;')
+                cursor.execute('SET CHARACTER SET utf8;')
+                cursor.execute('SET character_set_connection=utf8;')
+                
+                new_tweets = 0
+                already_tweets = 0
+                count_of_tweets = len(user_timeline)
+                session_total_tweets_found += count_of_tweets
+                log_msg("\t%d tweet(s) pulled..." % (count_of_tweets))
+                
+                for i, tweet in enumerate(user_timeline):                    
+                        
+                    text = str(tweet['text']).decode('utf-8', 'ignore').encode("utf-8")
+                    text = ''.join([j if ord(j) < 128 else ' ' for j in text])
+                    
+                    m = date_regex.search(tweet['created_at'])
+                    if m is not None:
+                        dt = datetime.datetime.strptime("%s-%s-%s %s:%s:%s" % (m.group(6), m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)), "%Y-%b-%d %H:%M:%S")
+                        #log_msg(dt)
+                        dt = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    else:
+                        log_msg("Regex fail: %s" % tweet['created_at'])
+                        sys.exit()
+                    
+                    if header == "":
+                        header = ",".join(tweet.keys())
+                        
+                    tweet_values = []
+                    for t in map(str, tweet.values()):
+                         
+                        tweet_values.append(str(t).replace(",", ";").replace(chr(13), "").replace(chr(10), ""))
+                    points.append(tweet['id'])
+                    
+                
+                    query = "Select count(1) from Tweets_Captured where created_at=%s and created_by=%s and text=%s and active=1"
+                    param = [dt, handle[1], text]
+                    cursor.execute(query, param)
+                    r = cursor.fetchone()
+                    if r[0] == 0:
+                        entities = str(tweet['entities']).decode('utf-8', 'ignore').encode("utf-8")
+                        if 'retweeted_status' in tweet:
+                            query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, in_reply_to_user_id, lang, entities, retweeted_tweet) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], tweet['in_reply_to_user_id'], tweet['lang'], entities, tweet['retweeted_status']['id']]
+                        else:
+                            query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, in_reply_to_user_id, lang, entities) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], tweet['in_reply_to_user_id'], tweet['lang'], entities]
+                        cursor.execute(query, param)
+                        new_tweets += 1
+                        handle_tweets_added += 1
+                        session_total_new_tweets += 1
+                    else:
+                        handle_tweets_already_added += 1
+                        already_tweets += 1
+                log_msg("\t\tnew tweets added:     %d" % (new_tweets))
+                log_msg("\t\ttweets already stored: %d" % (already_tweets))
+                
+                if True:
+                    mysql_conn.commit(); 
+                else:
+                    print("\n\n\tReminder - nothing is being committed...\n\n")
+                cursor.close(); mysql_conn.close() 
+                    
+                log_msg("Wait for %d seconds..." % per_call_delay)
+                for i in range(per_call_delay):
+                    time.sleep(1)
+                if count_of_tweets == 1:
+                    log_msg("Only one tweet was pulled, must have reached the end of the stream, exit pull for %s" % handle[1])
+                    break
+                if new_tweets == 0:
+                    log_msg("No new tweets found, must have captured all the new stuff, exit pull for %s" % handle[1])
+                    break
+            else:
+                break
+        if handle is not None:
             mysql_conn, r = mysql_connect();  mysql_attempts = 0
             while mysql_conn is None and mysql_attempts < 10:
                 time.sleep(15)
@@ -215,97 +309,11 @@ for handle in res:
                 log_msg("Could not connect to MySQL after 10 tries...exiting.")
                 sys.exit()
             cursor = mysql_conn.cursor()
-            cursor.execute('SET NAMES utf8mb4;')
-            cursor.execute('SET CHARACTER SET utf8;')
-            cursor.execute('SET character_set_connection=utf8;')
-            
-            new_tweets = 0
-            already_tweets = 0
-            count_of_tweets = len(user_timeline)
-            session_total_tweets_found += count_of_tweets
-            log_msg("\t%d tweet(s) pulled..." % (count_of_tweets))
-            
-            
-            for i, tweet in enumerate(user_timeline):
-                
-                text = str(tweet['text']).decode('utf-8', 'ignore').encode("utf-8")
-                #text = ''.join([c if len(c.encode('utf-8')) < 4 else '?' for c in text])
-                text = ''.join([j if ord(j) < 128 else ' ' for j in text])
-                
-                m = date_regex.search(tweet['created_at'])
-                if m is not None:
-                    dt = datetime.datetime.strptime("%s-%s-%s %s:%s:%s" % (m.group(6), m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)), "%Y-%b-%d %H:%M:%S")
-                    #log_msg(dt)
-                    dt = dt.strftime("%Y-%m-%d %H:%M:%S")
-                else:
-                    log_msg("Regex fail: %s" % tweet['created_at'])
-                    sys.exit()
-                #log_msg("Tweet: %s" % text)
-                #for t, d in zip(tweet.keys(), tweet.values()):
-                #    if t == "retweeted":
-                #        log_msg("Retweeted: %s" % d)
-                #    elif t == "source":
-                #        log_msg("Source: %s" % d)
-                #log_msg("Full Tweet: %s" % str(tweet))
-                if header == "":
-                    header = ",".join(tweet.keys())
-                    
-                tweet_values = []
-                for t in map(str, tweet.values()):
-                     
-                    tweet_values.append(str(t).replace(",", ";").replace(chr(13), "").replace(chr(10), ""))
-                #f.write("%s\n" % (",".join(map(str, tweet_values))))
-                points.append(tweet['id'])
-                #log_msg("---------------------------------\n")
-                
-            
-                query = "Select count(1) from Tweets_Captured where created_at=%s and created_by=%s and text=%s and active=1"
-                param = [dt, handle[1], text]
-                #log_msg("Query %s w/ %s" % (query, param))
-                cursor.execute(query, param)
-                r = cursor.fetchone()
-                if r[0] == 0:
-                    entities = str(tweet['entities']).decode('utf-8', 'ignore').encode("utf-8")
-                    query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, in_reply_to_user_id, lang, entities ) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                    param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], tweet['in_reply_to_user_id'], tweet['lang'], entities]
-                    #log_msg("Query %s w/ %s" % (query, param))
-                    cursor.execute(query, param)
-                    new_tweets += 1
-                    handle_tweets_added += 1
-                    session_total_new_tweets += 1
-                else:
-                    #log_msg("Tweet already stored...")
-                    handle_tweets_already_added += 1
-                    already_tweets += 1
-            log_msg("\t\tnew tweets added:     %d" % (new_tweets))
-            log_msg("\t\ttweets already stored: %d" % (already_tweets))
-            
-            mysql_conn.commit(); cursor.close(); mysql_conn.close() 
-                
-            log_msg("Wait for %d seconds..." % per_call_delay)
-            for i in range(per_call_delay):
-                time.sleep(1)
-            if count_of_tweets == 1:
-                log_msg("Only one tweet was pulled, must have reached the end of the stream, exit pull for %s" % handle[1])
-                break
-            if new_tweets == 0:
-                log_msg("No new tweets found, must have captured all the new stuff, exit pull for %s" % handle[1])
-                break
-            
-        
-        mysql_conn, r = mysql_connect();  mysql_attempts = 0
-        while mysql_conn is None and mysql_attempts < 10:
-            time.sleep(15)
-            mysql_conn, r = mysql_connect();  mysql_attempts += 1
-        if mysql_conn is None:
-            log_msg("Could not connect to MySQL after 10 tries...exiting.")
-            sys.exit()
-        cursor = mysql_conn.cursor()
-        log_msg("Done reading %s - %d tweets added; %d tweets already stored" % (handle[1], handle_tweets_added, handle_tweets_already_added))   
-        query = "UPDATE Twitter_Accounts set last_twitter_download=%s, total_twitter_downloads=total_twitter_downloads+1 where twitter_handle=%s"
-        param = [download_start, handle[1]]
-        cursor.execute(query, param)
-        mysql_conn.commit(); cursor.close(); mysql_conn.close()     
+            log_msg("Done reading %s - %d tweets added; %d tweets already stored" % (handle[1], handle_tweets_added, handle_tweets_already_added))   
+            query = "UPDATE Twitter_Accounts set last_twitter_download=%s, total_twitter_downloads=total_twitter_downloads+1 where twitter_handle=%s"
+            param = [download_start, handle[1]]
+            cursor.execute(query, param)
+            mysql_conn.commit(); cursor.close(); mysql_conn.close()     
     else:
         mysql_conn, r = mysql_connect();  mysql_attempts = 0
         while mysql_conn is None and mysql_attempts < 10:
@@ -335,4 +343,22 @@ query = "INSERT INTO Twitter_Pull_Sessions (start_time, end_time, accounts_scann
 param = [session_start_time, session_end_time, session_accounts_scanned, session_total_tweets_found, session_total_new_tweets, scan_auto_sourced_accounts]
 cursor.execute(query, param)
 mysql_conn.commit(); cursor.close(); mysql_conn.close() 
+
 log_msg("DONE!!!")
+
+bot = telegram.Bot(token=bot_token)
+
+# Waits for the first incoming message
+updates=[]
+while not updates:
+    updates = bot.getUpdates()
+    
+# Gets the id for the active chat
+
+chat_id=updates[-1].message.chat_id
+
+# Sends a message to the chat
+msg = "DL Tweets done: %s tweets read; %s new tweets from %s accounts." % ("{:,}".format(session_total_tweets_found), "{:,}".format(session_total_new_tweets), "{:,}".format(session_accounts_scanned))
+bot.sendMessage(chat_id=chat_id, text=msg)
+print("Telegram %s" % msg)
+

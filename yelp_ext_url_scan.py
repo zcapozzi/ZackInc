@@ -104,6 +104,8 @@ for r in res1:
     res.append(r)
 for r in res2:
     res.append(r)
+res1 = None
+res2 = None
 
 cursor.close(); mysql_conn.close()  
 #f = open('/home/pi/zack/tweets.csv', 'w')

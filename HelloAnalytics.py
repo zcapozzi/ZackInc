@@ -170,11 +170,11 @@ def get_results(service, profile_id, name, account_ID):
     ID = cursor.fetchone()[0]
     
     
-    insert_metric_query = "INSERT INTO GA_Metrics (timestamp, property_ID, description, data) VALUES (%s, %s, %s, %s)"
-    insert_dimension_metric_query = "INSERT INTO GA_Dimension_Metrics (timestamp, property_ID, description, dimension_description, data) VALUES (%s, %s, %s, %s, %s)"
+    insert_metric_query = "INSERT INTO GA_Metrics (timestamp, property_ID, description, data, most_recent) VALUES (%s, %s, %s, %s, 1)"
+    insert_dimension_metric_query = "INSERT INTO GA_Dimension_Metrics (timestamp, property_ID, description, dimension_description, data, most_recent) VALUES (%s, %s, %s, %s, %s, 1)"
    
-    insert_metric_query_no_data = "INSERT INTO GA_Metrics (timestamp, property_ID, description) VALUES (%s, %s, %s)"
-    insert_dimension_metric_query_no_data = "INSERT INTO GA_Dimension_Metrics (timestamp, property_ID, description, dimension_description) VALUES (%s, %s, %s, %s)"
+    insert_metric_query_no_data = "INSERT INTO GA_Metrics (timestamp, property_ID, description, most_recent) VALUES (%s, %s, %s, 1)"
+    insert_dimension_metric_query_no_data = "INSERT INTO GA_Dimension_Metrics (timestamp, property_ID, description, dimension_description, most_recent) VALUES (%s, %s, %s, %s, 1)"
    
     for key in single_keys:
         #print("\tGrab key: %s" % key)  
@@ -268,11 +268,18 @@ def main():
   # service account email and relative location of your key file.
   service_account_email = open('/home/pi/zack/zackcapozzi_google_api_service_email', 'r').read().strip()
   key_file_location = '/home/pi/zack/capozziinc-4af3fcf485ca.json'
+  mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
   if False: # if True, this will clear the tables prior to running
-      mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
+      
       cursor.execute("TRUNCATE TABLE GA_Metrics")
       cursor.execute("TRUNCATE TABLE GA_Dimension_Metrics")
-      mysql_conn.commit(); cursor.close(); mysql_conn.close();
+      
+  
+  reset_query = "UPDATE GA_Metrics set most_recent=0"
+  reset_query_2 = "UPDATE GA_Dimension_Metrics set most_recent=0"
+  cursor.execute(reset_query)
+  cursor.execute(reset_query_2)
+  mysql_conn.commit(); cursor.close(); mysql_conn.close();
   
   # Authenticate and construct service.
   service = get_service('analytics', 'v3', scope, key_file_location,
@@ -283,8 +290,7 @@ def main():
   for p, n, a in zip(profiles, names, account_ids):
     
     get_results(service, p, n, a)
-
-
+    
 if __name__ == '__main__':
   main()
 """

@@ -98,8 +98,49 @@ def log_msg(s):
     log.close()
     
 # Create a connection to the database
-mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 
+
+if False:
+    regex = re.compile(r'(\@.*?)\s*\|\s+([0-9]+)')
+    handles = re.findall(regex, open('/home/pi/zack/handles', 'r').read())
+    size = 100
+    for h_, h in enumerate(handles):
+        print("Process %s" % h[0])
+        loops = int(int(h[1])/size) + 1
+        print("\tThere will be %d loop(s) since there are %d tweets." % (loops, int(h[1])))
+
+        for i in range(loops):
+            if not os.path.isfile('/home/pi/zack/Data_Captures/Tweets/%s_%05d' % (h[0],i)):
+                mysql_conn, response = mysql_connect();  cursor = mysql_conn.cursor()
+                query = "SELECT * from Tweets_Captured where created_by='%s' limit %d offset %d" % (h[0], size, i*size)
+                print(query)
+                cursor.execute(query)
+                res = cursor.fetchall()
+                cursor.close();mysql_conn.close()  
+                f = open('/home/pi/zack/Data_Captures/Tweets/%s_%05d' % (h[0],i), 'w')
+                for r in res:
+                    f.write("%s\n" % "|ztc|".join(map(str, r)))
+                f.close()
+                time.sleep(1)
+                #break
+            else:
+                print("%05d already downloaded..." % i)
+        query = "DELETE FROM Tweets_Captured where created_by=%s"
+        param = [h[0]]
+        print("Query %s w/ %s" % (query, param))
+        mysql_conn, response = mysql_connect();  cursor = mysql_conn.cursor()
+        cursor.execute(query, param)
+        if True:    
+            mysql_conn.commit()
+        else:
+            print("\n\n\t Reminder, nothing is being committed...")
+        cursor.close();mysql_conn.close()
+        if h_ == 5:
+            break
+        
+    sys.exit()
+    
+mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 query = "SELECT ID, twitter_handle from Twitter_Accounts where active=1 order by last_twitter_download asc, ID desc"
 cursor.execute(query)
 res = cursor.fetchall()
@@ -121,6 +162,15 @@ for handle in res:
     twitter_handle = handle[1]
     per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/download_tweets_parameters', 'r').read()).group(1))
 
+    mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
+    query = "Select created_at from Tweets_Captured where created_by=%s and active=1"
+    param = [handle[1]]
+    print("Query %s w/ %s" % (query, param))
+    cursor.execute(query, param)
+    tweets_for_this_user = cursor.fetchall()
+    cursor.close(); mysql_conn.close()  
+    #print(tweets_for_this_user)
+                    
     handle_tweets_added = 0
     handle_tweets_already_added = 0
     download_start = datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S") 
@@ -155,14 +205,14 @@ for handle in res:
         
     except TwythonAuthError as e:
         if "Twitter API returned a 401 (Unauthorized)" in str(e):
-            log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+            log_msg("2) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
             log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
             log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
             log_msg("Error text: %s" % e)
             handle = None
             api = None
         else:
-            log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+            log_msg("3) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
             log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
             log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
             log_msg("Error text: %s" % e)
@@ -183,14 +233,14 @@ for handle in res:
                 log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
             except TwythonAuthError as e:
                 if "Twitter API returned a 401 (Unauthorized)" in str(e):
-                    log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+                    log_msg("4) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
                     log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
                     log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
                     log_msg("Error text: %s" % e)
                     handle = None
                     api = None
                 else:
-                    log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+                    log_msg("5) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
                     log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
                     log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
                     log_msg("Error text: %s" % e)
@@ -199,7 +249,7 @@ for handle in res:
                     sys.exit()
             except TwythonError as e:
                 if "Twitter API returned a 503 (Service Unavailable), Over capacity" in str(e):
-                    log_msg("1) TwythonError Error (503 (Service Unavailable), Over capacity) occurred when trying to capture the tweets for handle: %s" % handle[1])
+                    log_msg("6) TwythonError Error (503 (Service Unavailable), Over capacity) occurred when trying to capture the tweets for handle: %s" % handle[1])
                     log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
                     log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
                     log_msg("Error text: %s" % e)
@@ -208,7 +258,7 @@ for handle in res:
                     time.sleep(600)
         
                 else:    
-                    log_msg("1) TwythonError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
+                    log_msg("7) TwythonError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
                     log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
                     log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
                     log_msg("Error text: %s" % e)
@@ -227,9 +277,9 @@ for handle in res:
                     log_msg("Could not connect to MySQL after 10 tries...exiting.")
                     sys.exit()
                 cursor = mysql_conn.cursor()
-                cursor.execute('SET NAMES utf8mb4;')
-                cursor.execute('SET CHARACTER SET utf8;')
-                cursor.execute('SET character_set_connection=utf8;')
+                #cursor.execute('SET NAMES utf8mb4;')
+                #cursor.execute('SET CHARACTER SET utf8;')
+                #cursor.execute('SET character_set_connection=utf8;')
                 
                 new_tweets = 0
                 already_tweets = 0
@@ -260,26 +310,26 @@ for handle in res:
                         tweet_values.append(str(t).replace(",", ";").replace(chr(13), "").replace(chr(10), ""))
                     points.append(tweet['id'])
                     
-                
-                    query = "Select count(1) from Tweets_Captured where created_at=%s and created_by=%s and text=%s and active=1"
-                    param = [dt, handle[1], text]
-                    cursor.execute(query, param)
-                    r = cursor.fetchone()
-                    if r[0] == 0:
+                    check = dt
+                    if check in tweets_for_this_user:
+                        print("Tweet already added to the database...")
+                        handle_tweets_already_added += 1
+                        already_tweets += 1
+                    else:
+                        #if r[0] == 0:
                         entities = str(tweet['entities']).decode('utf-8', 'ignore').encode("utf-8")
                         if 'retweeted_status' in tweet:
-                            query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, in_reply_to_user_id, lang, entities, retweeted_tweet) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], tweet['in_reply_to_user_id'], tweet['lang'], entities, tweet['retweeted_status']['id']]
+                            query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, lang, entities, retweeted_tweet) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], tweet['lang'], entities, tweet['retweeted_status']['id']]
                         else:
-                            query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, in_reply_to_user_id, lang, entities) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], tweet['in_reply_to_user_id'], tweet['lang'], entities]
+                            query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, lang, entities) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], tweet['lang'], entities]
                         cursor.execute(query, param)
                         new_tweets += 1
                         handle_tweets_added += 1
                         session_total_new_tweets += 1
-                    else:
-                        handle_tweets_already_added += 1
-                        already_tweets += 1
+
+                        
                 log_msg("\t\tnew tweets added:     %d" % (new_tweets))
                 log_msg("\t\ttweets already stored: %d" % (already_tweets))
                 

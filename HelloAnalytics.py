@@ -82,10 +82,16 @@ def mysql_connect():
         client_key_pem = "instance/client_key_pem"
         ssl = {'cert': client_cert_pem, 'key': client_key_pem}
                     
+        host = "169.254.184.34"
+        local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
+        if local_or_remote == "remote":
+            host = "127.0.0.1"
+                    
+        #print("Connect on %s" % host)
         cnx = MySQLdb.connect(
-            host='127.0.0.1',
+            host=host,
             port=3306,
-            user='root', passwd='password', db='monoprice')
+            user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
         response = "Success!"
     except Exception as err:
         response = "Failed: %s" % err
@@ -267,7 +273,7 @@ def main():
   # Use the developer console and replace the values with your
   # service account email and relative location of your key file.
   service_account_email = open('/home/pi/zack/zackcapozzi_google_api_service_email', 'r').read().strip()
-  key_file_location = '/home/pi/zack/capozziinc-4af3fcf485ca.json'
+  key_file_location = '/home/pi/zack/capozziinc-a528d09ee730.json'
   mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
   if False: # if True, this will clear the tables prior to running
       

@@ -25,29 +25,27 @@ bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 def mysql_connect():
     cnx = None
     try:
-        env = os.getenv('SERVER_SOFTWARE')
-        if (env and env.startswith('Google App Engine/')):
-              #logging.info("Connecting via local...")
-              # Connecting from App Engine
-            cnx = MySQLdb.connect(
-            unix_socket='/cloudsql/pg-us-n-app-242036:us-central1:doormandb',
-            user=app.config['DBUSER'], passwd=app.config['DBPASS'], db=app.config['DBNAME'])
-            response = "Success!"
-        else:
-            # Connecting from an external network.
-            # Make sure your network is whitelisted
-            #logging.info("Connecting via remote %s..." % app.config['DBNAME'])
-            client_cert_pem = "instance/client_cert_pem"
-            client_key_pem = "instance/client_key_pem"
-            ssl = {'cert': client_cert_pem, 'key': client_key_pem}
-                        
-            cnx = MySQLdb.connect(
-                host='127.0.0.1',
-                port=3306,
-                user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
-            
-            #logging.info("Success = %s" % str(res[0]))
-            response = "Success!"
+        
+		# Connecting from an external network.
+		# Make sure your network is whitelisted
+		#logging.info("Connecting via remote %s..." % app.config['DBNAME'])
+		client_cert_pem = "instance/client_cert_pem"
+		client_key_pem = "instance/client_key_pem"
+		ssl = {'cert': client_cert_pem, 'key': client_key_pem}
+		 
+		host = "169.254.184.34"
+		local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
+		if local_or_remote == "remote":
+			host = "127.0.0.1"
+					
+		#print("Connect on %s" % host)
+		cnx = MySQLdb.connect(
+			host=host,
+			port=3306,
+			user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
+		
+		#logging.info("Success = %s" % str(res[0]))
+		response = "Success!"
     except Exception as err:
         response = "Failed."
         log_msg("Connection error: %s" % err)
@@ -98,48 +96,7 @@ def log_msg(s):
     log.close()
     
 # Create a connection to the database
-
-
-if False:
-    regex = re.compile(r'(\@.*?)\s*\|\s+([0-9]+)')
-    handles = re.findall(regex, open('/home/pi/zack/handles', 'r').read())
-    size = 100
-    for h_, h in enumerate(handles):
-        print("Process %s" % h[0])
-        loops = int(int(h[1])/size) + 1
-        print("\tThere will be %d loop(s) since there are %d tweets." % (loops, int(h[1])))
-
-        for i in range(loops):
-            if not os.path.isfile('/home/pi/zack/Data_Captures/Tweets/%s_%05d' % (h[0],i)):
-                mysql_conn, response = mysql_connect();  cursor = mysql_conn.cursor()
-                query = "SELECT * from Tweets_Captured where created_by='%s' limit %d offset %d" % (h[0], size, i*size)
-                print(query)
-                cursor.execute(query)
-                res = cursor.fetchall()
-                cursor.close();mysql_conn.close()  
-                f = open('/home/pi/zack/Data_Captures/Tweets/%s_%05d' % (h[0],i), 'w')
-                for r in res:
-                    f.write("%s\n" % "|ztc|".join(map(str, r)))
-                f.close()
-                time.sleep(1)
-                #break
-            else:
-                print("%05d already downloaded..." % i)
-        query = "DELETE FROM Tweets_Captured where created_by=%s"
-        param = [h[0]]
-        print("Query %s w/ %s" % (query, param))
-        mysql_conn, response = mysql_connect();  cursor = mysql_conn.cursor()
-        cursor.execute(query, param)
-        if True:    
-            mysql_conn.commit()
-        else:
-            print("\n\n\t Reminder, nothing is being committed...")
-        cursor.close();mysql_conn.close()
-        if h_ == 5:
-            break
-        
-    sys.exit()
-    
+   
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 query = "SELECT ID, twitter_handle from Twitter_Accounts where active=1 order by last_twitter_download asc, ID desc"
 cursor.execute(query)
@@ -167,7 +124,10 @@ for handle in res:
     param = [handle[1]]
     print("Query %s w/ %s" % (query, param))
     cursor.execute(query, param)
-    tweets_for_this_user = cursor.fetchall()
+    tweets_for_this_user_ = cursor.fetchall()
+    tweets_for_this_user = []
+    for t in tweets_for_this_user_:
+		tweets_for_this_user.append(t[0])
     cursor.close(); mysql_conn.close()  
     #print(tweets_for_this_user)
                     
@@ -296,7 +256,7 @@ for handle in res:
                     if m is not None:
                         dt = datetime.datetime.strptime("%s-%s-%s %s:%s:%s" % (m.group(6), m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)), "%Y-%b-%d %H:%M:%S")
                         #log_msg(dt)
-                        dt = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        #dt = dt.strftime("%Y-%m-%d %H:%M:%S")
                     else:
                         log_msg("Regex fail: %s" % tweet['created_at'])
                         sys.exit()
@@ -312,18 +272,21 @@ for handle in res:
                     
                     check = dt
                     if check in tweets_for_this_user:
-                        print("Tweet already added to the database...")
+                        #print("Tweet already added to the database...")
                         handle_tweets_already_added += 1
                         already_tweets += 1
                     else:
                         #if r[0] == 0:
                         entities = str(tweet['entities']).decode('utf-8', 'ignore').encode("utf-8")
+                        lang = ''
+                        if 'lang' in tweet:
+							lang = tweet['lang']
                         if 'retweeted_status' in tweet:
                             query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, lang, entities, retweeted_tweet) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], tweet['lang'], entities, tweet['retweeted_status']['id']]
+                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], lang, entities, tweet['retweeted_status']['id']]
                         else:
                             query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, lang, entities) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], tweet['lang'], entities]
+                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], lang, entities]
                         cursor.execute(query, param)
                         new_tweets += 1
                         handle_tweets_added += 1

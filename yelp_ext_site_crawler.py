@@ -55,8 +55,14 @@ def mysql_connect():
             client_key_pem = "instance/client_key_pem"
             ssl = {'cert': client_cert_pem, 'key': client_key_pem}
                         
+            host = "169.254.184.34"
+            local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
+            if local_or_remote == "remote":
+                host = "127.0.0.1"
+                        
+            print("Connect on %s" % host)
             cnx = MySQLdb.connect(
-                host='127.0.0.1',
+                host=host,
                 port=3306,
                 user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
             

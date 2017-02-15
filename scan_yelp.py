@@ -48,8 +48,14 @@ def mysql_connect():
             client_key_pem = "instance/client_key_pem"
             ssl = {'cert': client_cert_pem, 'key': client_key_pem}
                         
+            host = "169.254.184.34"
+            local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
+            if local_or_remote == "remote":
+                host = "127.0.0.1"
+                        
+            #print("Connect on %s" % host)
             cnx = MySQLdb.connect(
-                host='127.0.0.1',
+                host=host,
                 port=3306,
                 user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
             
@@ -74,8 +80,59 @@ YOUR_TOKEN = r3.search(key_data).group(1)
 YOUR_TOKEN_SECRET = r4.search(key_data).group(1)
 key_data = None
 
-
-
+def get_zips():
+	if os.path.isfile('/home/pi/zack/zip_codes.csv'):
+		zips = open('/home/pi/zack/zip_codes.csv', 'r').read().split("\n")  
+	elif os.path.isfile('/home/pi/zack/14zpallnoagi.csv'):
+		zips = []
+		if True:
+			print("Open file 2...")
+			data = open('/home/pi/zack/14zpallagi.csv', 'r').read().split("\n")
+			print("Process file 2...")
+			for i, d in enumerate(data[1:]):
+				if i % 10000 == 0:
+					print("\t%d / %d @ %s" % (i, len(data), datetime.datetime.today()))
+				#print(d)
+				tokens = d.split(',')
+				if len(tokens) > 2:
+					#print(tokens[2])
+					if tokens[2] not in zips:
+						zips.append(tokens[2])
+		
+		if True:
+			print("Open file 1...")
+			data = open('/home/pi/zack/14zpallnoagi.csv', 'r').read().split("\n")
+			print("Process file 1...")
+			
+			for i, d in enumerate(data[1:]):
+				if i % 3000 == 0:
+					print("\t%d / %d @ %s" % (i, len(data), datetime.datetime.today()))
+				#print(d)
+				tokens = d.split(',')
+				if len(tokens) > 2:
+					#print(tokens[2])
+					if tokens[2] not in zips:
+						zips.append(tokens[2])
+		if True:
+			print("Open file 3...")
+			data = open('/home/pi/zack/rows.csv', 'r').read().split("\n")
+			print("Process file 3...")
+			for i, d in enumerate(data[1:]):
+				if i % 25000 == 0:
+					print("\t%d / %d @ %s" % (i, len(data), datetime.datetime.today()))
+				#print(d)
+				tokens = d.split(',')
+				if len(tokens) > 2:
+					#print(tokens[2])
+					if tokens[2] not in zips:
+						zips.append(tokens[2])
+		print("Found %d total zips..." % (len(zips)))
+		f = open('/home/pi/zack/zip_codes.csv', 'w')
+		for z in zips:
+			f.write("%s\n" % z)
+		f.close()
+		sys.exit()
+	return zips
 category_filter = "bakeries"
 params = {
     'term': 'food',
@@ -87,7 +144,7 @@ params2 = {
     'offset': 20
 }
 
-zips = open('/home/pi/zack/zip_codes.csv', 'r').read().split("\n")  
+zips = get_zips()
 print("There are %d zips that need to be searched..." % len(zips))
 
 

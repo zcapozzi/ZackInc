@@ -6,7 +6,8 @@ from apiclient import errors
 from apiclient.discovery import build
 from oauth2client.client import OAuth2WebServerFlow
 import sys, time, datetime
-from datetime import datetime
+from datetime import datetime, timedelta
+
 import MySQLdb
 
 from googleapiclient import sample_tools
@@ -22,10 +23,16 @@ def mysql_connect():
         client_key_pem = "instance/client_key_pem"
         ssl = {'cert': client_cert_pem, 'key': client_key_pem}
                     
+        host = "169.254.184.34"
+        local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
+        if local_or_remote == "remote":
+            host = "127.0.0.1"
+                    
+        #print("Connect on %s" % host)
         cnx = MySQLdb.connect(
-            host='127.0.0.1',
+            host=host,
             port=3306,
-            user='root', passwd='password', db='monoprice')
+            user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
         response = "Success!"
     except Exception as err:
         response = "Failed: %s" % err
@@ -89,7 +96,7 @@ REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
 #credentials = flow.step2_exchange(code)
 
 service_account_email = open('/home/pi/zack/zackcapozzi_google_api_service_email', 'r').read().strip()
-key_file_location = '/home/pi/zack/capozziinc-4af3fcf485ca.json'
+key_file_location = '/home/pi/zack/capozziinc-a528d09ee730.json'
   
 credentials = ServiceAccountCredentials.from_json_keyfile_name(
     key_file_location, scopes=OAUTH_SCOPE)
@@ -108,56 +115,77 @@ verified_sites_urls = [s['siteUrl'] for s in site_list['siteEntry']
                        if s['permissionLevel'] != 'siteUnverifiedUser'
                           and s['siteUrl'][:4] == 'http']
 
+wait_delay = 2
 # Printing the URLs of all websites you are verified for.
+
+mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor();
+query = "UPDATE GS_Metrics set most_recent=0"
+cursor.execute(query)
+query = "UPDATE GS_Dimension_Metrics set most_recent=0"
+cursor.execute(query)
+mysql_conn.commit(); cursor.close(); mysql_conn.close(); 
+metrics_insert = "INSERT INTO GS_Metrics (timestamp, property_ID, description, data, most_recent) VALUES (%s, %s, %s, %s, 1)"
+dimension_metrics_insert = "INSERT INTO GS_Dimension_Metrics (timestamp, property_ID, metric, description, dimension_description, data, most_recent) VALUES (%s, %s, %s, %s, %s, %s, 1)"
 for site_url in verified_sites_urls:
+    
     if True:
-        if site_url == "http://lacrossereference.com/":
-            print "************************************\n%s\n-------------------------------------------" % site_url
-            start_date = "2017-02-01"
-            end_date = "2017-02-08"
-            request = {
-              'startDate': start_date,
-              'endDate': end_date,
-              'dimensions': ['date']
-            }
-            time.sleep(5); response = execute_request(service, site_url, request)
-            print_table(response, 'Available dates'); print("")
+        if True or site_url == "http://lacrossereference.com/":
+            mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor();
+            query = "SELECT ID from GA_Properties where url=%s"
+            param = [site_url]
+            cursor.execute(query, param)
+            property_ID = cursor.fetchone()[0]
+            print "************************************\n%s (%d)\n-------------------------------------------" % (site_url, property_ID)
+            start_date = (datetime.today() - timedelta(days=7)).strftime("%Y-%m-%d")
+            end_date = datetime.today().strftime("%Y-%m-%d")
+            print("Search %s to %s" % (start_date, end_date))
+            
             
             # Get totals for the date range.
             request = {
               'startDate': start_date,
               'endDate': end_date
             }
-            time.sleep(5); response = execute_request(service, site_url, request)
+            time.sleep(wait_delay); response = execute_request(service, site_url, request);
             print_table(response, 'Totals'); print("")
-
+            
+            if 'rows' in response and response['rows'] is not None:
+                for row in response['rows']:
+                    param = [datetime.today(), property_ID, 'clicks', row['clicks']]
+                    print("%s w/ %s" % (metrics_insert, param))
+                    cursor.execute(metrics_insert, param)
+                    
+                    param = [datetime.today(), property_ID, 'impressions', row['impressions']]
+                    print("%s w/ %s" % (metrics_insert, param))
+                    cursor.execute(metrics_insert, param)
+                    
+                    param = [datetime.today(), property_ID, 'position', row['position']]
+                    print("%s w/ %s" % (metrics_insert, param))
+                    cursor.execute(metrics_insert, param)
+            
             # Get top 10 queries for the date range, sorted by click count, descending.
             request = {
               'startDate': start_date,
               'endDate': end_date,
               'dimensions': ['query'],
-              'rowLimit': 10
+              'rowLimit': 15
             }
-            time.sleep(5); response = execute_request(service, site_url, request)
+            time.sleep(wait_delay); response = execute_request(service, site_url, request)
             print_table(response, 'Top Queries'); print("")
-
-            # Get top 11-20 mobile queries for the date range, sorted by click count, descending.
-            request = {
-              'startDate': start_date,
-              'endDate': end_date,
-              'dimensions': ['query'],
-              'dimensionFilterGroups': [{
-                  'filters': [{
-                      'dimension': 'device',
-                      'expression': 'mobile'
-                  }]
-              }],
-              'rowLimit': 10,
-              'startRow': 10
-            }
-            time.sleep(5); response = execute_request(service, site_url, request)
-            print_table(response, 'Top 11-20 Mobile Queries'); print("")
-
+            if 'rows' in response and response['rows'] is not None:
+                for row in response['rows']:
+                    param = [datetime.today(), property_ID, 'clicks', 'top queries', u','.join(row['keys']).encode('utf-8'), row['clicks']]
+                    print("%s w/ %s" % (dimension_metrics_insert, param))
+                    cursor.execute(dimension_metrics_insert, param)
+                    
+                    param = [datetime.today(), property_ID, 'impressions', 'top queries', u','.join(row['keys']).encode('utf-8'), row['impressions']]
+                    print("%s w/ %s" % (dimension_metrics_insert, param))
+                    cursor.execute(dimension_metrics_insert, param)
+                    
+                    param = [datetime.today(), property_ID, 'position', 'top queries', u','.join(row['keys']).encode('utf-8'), row['position']]
+                    print("%s w/ %s" % (dimension_metrics_insert, param))
+                    cursor.execute(dimension_metrics_insert, param)
+            
             # Get top 10 pages for the date range, sorted by click count, descending.
             request = {
               'startDate': start_date,
@@ -165,25 +193,22 @@ for site_url in verified_sites_urls:
               'dimensions': ['page'],
               'rowLimit': 10
             }
-            time.sleep(5); response = execute_request(service, site_url, request)
+            time.sleep(wait_delay); response = execute_request(service, site_url, request)
             print_table(response, 'Top Pages'); print("")
-
-            # Get the top 10 queries in India, sorted by click count, descending.
-            request = {
-              'startDate': start_date,
-              'endDate': end_date,
-              'dimensions': ['query'],
-              'dimensionFilterGroups': [{
-                  'filters': [{
-                      'dimension': 'country',
-                      'expression': 'ind'
-                  }]
-              }],
-              'rowLimit': 10
-            }
-            time.sleep(5); response = execute_request(service, site_url, request)
-            print_table(response, 'Top queries in India'); print("")
-
+            if 'rows' in response and response['rows'] is not None:
+                for row in response['rows']:
+                    param = [datetime.today(), property_ID, 'clicks', 'top pages', u','.join(row['keys']).encode('utf-8'), row['clicks']]
+                    print("%s w/ %s" % (dimension_metrics_insert, param))
+                    cursor.execute(dimension_metrics_insert, param)
+                    
+                    param = [datetime.today(), property_ID, 'impressions', 'top pages', u','.join(row['keys']).encode('utf-8'), row['impressions']]
+                    print("%s w/ %s" % (dimension_metrics_insert, param))
+                    cursor.execute(dimension_metrics_insert, param)
+                    
+                    param = [datetime.today(), property_ID, 'position', 'top pages', u','.join(row['keys']).encode('utf-8'), row['position']]
+                    print("%s w/ %s" % (dimension_metrics_insert, param))
+                    cursor.execute(dimension_metrics_insert, param)
+            
             # Group by both country and device.
             request = {
               'startDate': start_date,
@@ -191,8 +216,38 @@ for site_url in verified_sites_urls:
               'dimensions': ['country', 'device'],
               'rowLimit': 10
             }
-            time.sleep(5); response = execute_request(service, site_url, request)
+            time.sleep(wait_delay); response = execute_request(service, site_url, request)
             print_table(response, 'Group by country and device'); print("")
+            
+            # Group by both country and device.
+            request = {
+              'startDate': start_date,
+              'endDate': end_date,
+              'dimensions': ['country'],
+              'rowLimit': 10
+            }
+            time.sleep(wait_delay); response = execute_request(service, site_url, request)
+            print_table(response, 'Group by country'); print("")
+            if 'rows' in response and response['rows'] is not None:
+                for row in response['rows']:
+                    param = [datetime.today(), property_ID, 'clicks', 'top countries', u','.join(row['keys']).encode('utf-8'), row['clicks']]
+                    print("%s w/ %s" % (dimension_metrics_insert, param))
+                    cursor.execute(dimension_metrics_insert, param)
+                    
+                    param = [datetime.today(), property_ID, 'impressions', 'top countries', u','.join(row['keys']).encode('utf-8'), row['impressions']]
+                    print("%s w/ %s" % (dimension_metrics_insert, param))
+                    cursor.execute(dimension_metrics_insert, param)
+                    
+                    param = [datetime.today(), property_ID, 'position', 'top countries', u','.join(row['keys']).encode('utf-8'), row['position']]
+                    print("%s w/ %s" % (dimension_metrics_insert, param))
+                    cursor.execute(dimension_metrics_insert, param)
+            
+            
+            if True:
+                mysql_conn.commit()
+            else:
+                print("\n\n\tReminder, nothing is being committed...")
+            mysql_conn.close(); cursor.close()
     else:
         print site_url
         # Retrieve list of sitemaps submitted
@@ -201,10 +256,3 @@ for site_url in verified_sites_urls:
             sitemap_urls = [s['path'] for s in sitemaps['sitemap']]
             #print "  " + "\n  ".join(sitemap_urls)
 
-        print("Retrieve Search Analytics...")
-        # Retrieve list of search analytics
-        body = ""
-        searchAnalytics = service.searchanalytics().query()
-        
-        print(searchAnalytics.__class__)
-        print(searchAnalytics)

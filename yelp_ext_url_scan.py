@@ -99,6 +99,18 @@ if mysql_conn is None:
     sys.exit()
 cursor = mysql_conn.cursor()
 
+
+
+scriptname = "yelp_ext_url_scan"
+query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
+param = [scriptname]
+cursor.execute(query, param)
+local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read().strip()
+row = cursor.fetchone()
+if local_or_remote != row[0]:
+    print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
+    sys.exit()
+    
 query = "SELECT yelp_url, yelp_ID from Yelp_Listings where country_code ='US' and active=1 and manually_scanned=0"
 cursor.execute(query)
 res1 = cursor.fetchall()
@@ -160,6 +172,12 @@ for k, url in enumerate(res):
         status = None
     except httplib2.ServerNotFoundError: 
         log_msg("ServerNotFound Error with link:\n\t%s\n" % url[0])
+        status = None
+    except OverflowError: 
+        log_msg("OverflowError, not sure why this was grabbed as a link\n\t%s\n" % url[0])
+        status = None
+    except httplib.IncompleteRead: 
+        log_msg("Incomplete read, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
     except ssl.SSLEOFError: 
         log_msg("SSL Issue with link:\n\t%s\n" % url[0])

@@ -260,6 +260,18 @@ def log_msg(s, no_print=False):
 # Create a connection to the database
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 
+
+
+scriptname = "yelp_ext_site_crawler"
+query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
+param = [scriptname]
+cursor.execute(query, param)
+local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read().strip()
+row = cursor.fetchone()
+if local_or_remote != row[0]:
+    print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
+    sys.exit()
+    
 query = "SELECT a.yelp_url, a.yelp_ID, a.external_url, b.ID from Yelp_Listings a, Data_Capture_Campaigns b where a.country_code='US' and b.ID=a.data_capture_campaign_ID and IFNULL(a.external_url, '')!='' and a.active=1 and a.scanned_ext_for_emails=0"
 cursor.execute(query)
 res1 = cursor.fetchall()

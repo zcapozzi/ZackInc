@@ -275,6 +275,17 @@ def main():
   service_account_email = open('/home/pi/zack/zackcapozzi_google_api_service_email', 'r').read().strip()
   key_file_location = '/home/pi/zack/capozziinc-a528d09ee730.json'
   mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
+  
+
+	scriptname = "HelloAnalytics"
+	query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
+	param = [scriptname]
+	cursor.execute(query, param)
+	local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read().strip()
+	row = cursor.fetchone()
+	if local_or_remote != row[0]:
+		print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
+		sys.exit()
   if False: # if True, this will clear the tables prior to running
       
       cursor.execute("TRUNCATE TABLE GA_Metrics")

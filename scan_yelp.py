@@ -181,6 +181,19 @@ if mysql_conn is None:
     log_msg("Could not connect to MySQL after 10 tries...exiting.")
 
 cursor = mysql_conn.cursor()
+
+
+
+scriptname = "scan_yelp"
+query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
+param = [scriptname]
+cursor.execute(query, param)
+local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read().strip()
+row = cursor.fetchone()
+if local_or_remote != row[0]:
+    print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
+    sys.exit()
+    
 query = "SELECT ID from Data_Capture_Campaigns where name like '%Yelp%' and active=1"
 cursor.execute(query)
 data_campaign_IDs = cursor.fetchall()

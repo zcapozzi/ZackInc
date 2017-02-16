@@ -33,7 +33,7 @@ def mysql_connect():
 		client_key_pem = "instance/client_key_pem"
 		ssl = {'cert': client_cert_pem, 'key': client_key_pem}
 		 
-		host = "192.168.1.149"
+		host = "169.254.184.34"
 		local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
 		if local_or_remote == "remote":
 			host = "127.0.0.1"
@@ -48,7 +48,7 @@ def mysql_connect():
 		response = "Success!"
     except Exception as err:
         response = "Failed."
-        log_msg("Connection error: %s" % err)
+        print("Connection error: %s" % err)
         
     return cnx, response
 
@@ -91,16 +91,45 @@ def authenticate_me(whoami):
 
 #1 Confirm that the arguments were all accounted for 
 #python send_tweet.py [as who] [text] [optional photo path]
+args = sys.argv
 
-#2 Use [as who] to authenticate above
+send_as = ""
+tweet = ""
+image_path = ""
+image_yes_no = 0
+if len(args) == 3:
+	image_path = None
+	send_as = args[1]
+	tweet = args[2]
+elif len(args) == 4:
+	image_path = args[3]
+	send_as = args[1]
+	tweet = args[2]
+	image_yes_no = 1
+	if not os.path.isfile(image_path):
+		print("The image you want to tweet was not a valid file name\n---------------------------------------\n\t%s" % image_path)
+		sys.exit()
+else:
+	print("Invalid arguments Error\n--------------------------\n\tsend_tweet.py [send as] [tweet text] [optional image path]")
+	sys.exit()
 
+
+#2 Use [send_as] to authenticate above
+api = authenticate_me(send_as)
+if api is None:
+	print("Authentication failed\n--------------------------\n\tsend_tweet.py [send as] [tweet text] [optional image path]")
+	sys.exit()
+	
 #3 Send status/tweet
+api.update_status(tweet)
+api = None
 
 #4 Create record in the database
 
 mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
-query = ""
-param = []
+query = "INSERT INTO Tweets_Sent (datestamp, sent_as, content, image_yes_no, image_path, active) VALUES (%s, %s, %s, %s, %s, 1)"
+param = [datetime.datetime.today(), send_as, tweet, image_yes_no, image_path]
+print("Query %s w/ %s" % (query, param))
 cursor.execute(query, param)
 mysql_conn.commit();
 cursor.close(); mysql_conn.close()

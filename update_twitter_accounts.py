@@ -40,16 +40,16 @@ def mysql_connect():
             ssl = {'cert': client_cert_pem, 'key': client_key_pem}
                         
             host = "169.254.184.34"
-			local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
-			if local_or_remote == "remote":
-				host = "127.0.0.1"
-						
-			print("Connect on %s" % host)
-			cnx = MySQLdb.connect(
-				host=host,
-				port=3306,
-				user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
-				
+            local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
+            if local_or_remote == "remote":
+                host = "127.0.0.1"
+                        
+            #print("Connect on %s" % host)
+            cnx = MySQLdb.connect(
+                host=host,
+                port=3306,
+                user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
+                
             #logging.info("Success = %s" % str(res[0]))
             response = "Success!"
     except Exception as err:
@@ -94,6 +94,16 @@ def authenticate_me(whoami):
 current_milli_time = lambda: int(round(time.time() * 1000))    
 # Create a connection to the database
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
+
+scriptname = "update_twitter_accounts"
+query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
+param = [scriptname]
+cursor.execute(query, param)
+local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read().strip()
+row = cursor.fetchone()
+if local_or_remote != row[0]:
+    print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
+    sys.exit()
 
 query = "SELECT ID, twitter_handle from Twitter_Accounts where active=1 order by ID desc"
 cursor.execute(query)

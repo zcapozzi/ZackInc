@@ -119,6 +119,18 @@ wait_delay = 2
 # Printing the URLs of all websites you are verified for.
 
 mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor();
+
+
+scriptname = "HelloSearchConsole"
+query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
+param = [scriptname]
+cursor.execute(query, param)
+local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read().strip()
+row = cursor.fetchone()
+if local_or_remote != row[0]:
+    print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
+    sys.exit()
+    
 query = "UPDATE GS_Metrics set most_recent=0"
 cursor.execute(query)
 query = "UPDATE GS_Dimension_Metrics set most_recent=0"

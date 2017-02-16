@@ -98,6 +98,19 @@ def log_msg(s):
 # Create a connection to the database
    
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
+
+
+
+scriptname = "download_tweets"
+query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
+param = [scriptname]
+cursor.execute(query, param)
+local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read().strip()
+row = cursor.fetchone()
+if local_or_remote != row[0]:
+    print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
+    sys.exit()
+    
 query = "SELECT ID, twitter_handle from Twitter_Accounts where active=1 order by last_twitter_download asc, ID desc"
 cursor.execute(query)
 res = cursor.fetchall()

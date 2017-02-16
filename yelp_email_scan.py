@@ -85,6 +85,18 @@ def log_msg(s, no_print=False):
 # Create a connection to the database
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 
+
+
+scriptname = "yelp_email_scan"
+query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
+param = [scriptname]
+cursor.execute(query, param)
+local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read().strip()
+row = cursor.fetchone()
+if local_or_remote != row[0]:
+    print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
+    sys.exit()
+    
 query  = "SELECT a.url, b.ID, c.ID, a.yelp_listing_ID, a.time_stored, a.capture_sequence from Data_Capture_Links a, Data_Capture_Campaigns b, Email_Scrapes c where "
 query += "c.active=1 and c.complete = 0 and a.scanned_for_emails=0 and ISNULL(crawl_errors) and IFNULL(a.content_type, '')='' and "
 query += "c.data_capture_campaign_ID=a.data_capture_campaign_ID and  b.ID=a.data_capture_campaign_ID"
@@ -153,6 +165,9 @@ for k, url in enumerate(res2):
         log_msg("Returned a response of length %d" % len(response), no_print=True)
     except httplib.BadStatusLine: 
         log_msg("Found a bad status line, not sure why this was grabbed as a link\n\t%s\n" % url[0])
+        status = None
+    except OverflowError: 
+        log_msg("OverflowError, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
     except httplib.IncompleteRead: 
         log_msg("Incomplete read, not sure why this was grabbed as a link\n\t%s\n" % url[0])

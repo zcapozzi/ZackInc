@@ -2,7 +2,7 @@ import time, os, datetime, sys, psutil, random
 import re
 import MySQLdb
 import subprocess
-import telegram
+import telegram; bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 from bs4 import BeautifulSoup
 #import requests
 #import httplib2
@@ -20,7 +20,7 @@ from subprocess import Popen, PIPE
 
 import clipboard
 
-bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
+
 
 def mysql_connect():
     cnx = None

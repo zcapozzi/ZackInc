@@ -1,8 +1,12 @@
+flog = open('/home/pi/zack/send_tweet_log', 'w')
+flog.write("Start\n")
+
 import time, os, datetime, sys, psutil, random
 import re
 import MySQLdb
 import subprocess
 import telegram
+import glob
 from bs4 import BeautifulSoup
 #import requests
 #import httplib2
@@ -92,6 +96,7 @@ def authenticate_me(whoami):
 #1 Confirm that the arguments were all accounted for 
 #python send_tweet.py [as who] [text] [optional photo path]
 args = sys.argv
+flog.write("#1\n")
 
 send_as = ""
 tweet = ""
@@ -115,17 +120,34 @@ else:
 
 
 #2 Use [send_as] to authenticate above
+flog.write("#2\n")
 api = authenticate_me(send_as)
 if api is None:
 	print("Authentication failed\n--------------------------\n\tsend_tweet.py [send as] [tweet text] [optional image path]")
 	sys.exit()
 	
-#3 Send status/tweet
-api.update_status(tweet)
+	
+#3 Attach image if necessary
+flog.write("#3\n")
+image_ids = None
+if image_path is not None:
+	image_open = open(image_path, 'rb')
+	image_ids = api.upload_media(media=image_open)
+
+#4 Send status/tweet
+flog.write("#4\n")
+for i in range(30):
+	print("Sending %s in %d..." % (tweet, (30-i))); time.sleep(1)
+	
+if image_ids is not None:
+	api.update_status(status=tweet, media_ids=image_ids['media_id'])
+else:
+	flog.write("Send tweet: %s\n" % (tweet))
+	api.update_status(status=tweet)
 api = None
 
-#4 Create record in the database
-
+#5 Create record in the database
+flog.write("#5\n")
 mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
 query = "INSERT INTO Tweets_Sent (datestamp, sent_as, content, image_yes_no, image_path, active) VALUES (%s, %s, %s, %s, %s, 1)"
 param = [datetime.datetime.today(), send_as, tweet, image_yes_no, image_path]
@@ -133,3 +155,4 @@ print("Query %s w/ %s" % (query, param))
 cursor.execute(query, param)
 mysql_conn.commit();
 cursor.close(); mysql_conn.close()
+flog.close()

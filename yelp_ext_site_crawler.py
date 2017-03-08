@@ -100,7 +100,7 @@ def get_links(url, layer, offset, parent, tag_type):
         #print("create http for %s" % url)
         log_msg("Create http for %s\n" % url, no_print=True)
         time.sleep(1)
-        http = httplib2.Http(timeout=20)
+        http = httplib2.Http(timeout=20, disable_ssl_certificate_validation=True)
         #print("make request")
         try:
             requests_made += 1
@@ -118,11 +118,17 @@ def get_links(url, layer, offset, parent, tag_type):
         except zlib.error: 
             log_msg("zlib decompression error, not sure why this was grabbed as a link\n\t%s\n" % url)
             status = None
+        except httplib2.MalformedHeader: 
+            log_msg("MalformedHeader, not sure why this was grabbed as a link\n\t%s\n" % url)
+            status = None
         except httplib2.RelativeURIError: 
             log_msg("RelativeURIError, not sure why this was grabbed as a link\n\t%s\n" % url)
             status = None
         except httplib2.FailedToDecompressContent: 
             log_msg("FailedToDecompressContent, not sure why this was grabbed as a link\n\t%s\n" % url)
+            status = None
+        except httplib.ResponseNotReady: 
+            log_msg("Found an ResponseNotReady Error, not sure why this was grabbed as a link\n\t%s\n" % url)
             status = None
         except httplib2.RedirectMissingLocation: 
             log_msg("RedirectMissingLocation, not sure why this was grabbed as a link\n\t%s\n" % url)
@@ -334,8 +340,9 @@ for site in sites:
         capture_manually = 0
         if "contact" in link.lower():
             capture_manually = 1
+        upload_link = link.decode('utf-8', 'ignore').encode('utf-8')
         query2 = "INSERT INTO Data_Capture_Links (yelp_listing_ID, data_capture_campaign_ID, time_stored, url, capture_sequence, layer, found_on, new_links_found, content_type, tag_type, capture_manually, scanned_for_emails) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-        param2 = [site['yelp_listing_ID'], site['data_capture_campaign_ID'], current_milli_time(), link, i, detail['found_at_layer'], detail['found_on'], detail['new_links_found'], detail['content_type'], detail['tag_type'], capture_manually, 0]
+        param2 = [site['yelp_listing_ID'], site['data_capture_campaign_ID'], current_milli_time(), upload_link, i, detail['found_at_layer'], detail['found_on'], detail['new_links_found'], detail['content_type'], detail['tag_type'], capture_manually, 0]
         #print("Query: %s \n\tw/ %s\n" % (query2, param2))
         cursor.execute(query2, param2)
 

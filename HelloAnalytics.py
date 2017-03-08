@@ -162,9 +162,11 @@ def get_results(service, profile_id, name, account_ID):
     record = {'Service': 'zack'}
     single_keys = ['sessions', 'bounces', 'avgSessionDuration', 'users', 'newUsers']
     multiple_keys = [['date', '7dayUsers'], ['date', '14dayUsers'], ['date', '30dayUsers'], 
-    ['sourceMedium', 'timeOnPage'], ['sourceMedium', 'newUsers'], ['sourceMedium', 'Users'],
-    ['adContent', 'timeOnPage'], ['adContent', 'newUsers'], ['adContent', 'Users'],
-    ['hostname, ga:pagePath', 'timeOnPage'], ['hostname, ga:pagePath', 'newUsers'], ['hostname, ga:pagePath', 'Users']]
+    ['sourceMedium', 'timeOnPage'], ['sourceMedium', 'newUsers'], ['sourceMedium', 'Users'], ['sourceMedium', 'pageviews'], ['sourceMedium', 'organicSearches'],
+    ['adContent', 'timeOnPage'], ['adContent', 'newUsers'], ['adContent', 'Users'], ['adContent', 'pageviews'], ['adContent', 'organicSearches'],
+    ['searchKeyword', 'timeOnPage'], ['searchKeyword', 'newUsers'], ['searchKeyword', 'Users'], ['searchKeyword', 'pageviews'], ['searchKeyword', 'organicSearches'],
+    ['searchStartPage', 'timeOnPage'], ['searchStartPage', 'newUsers'], ['searchStartPage', 'Users'], ['searchStartPage', 'pageviews'], ['searchStartPage', 'organicSearches'],
+    ['hostname, ga:pagePath', 'timeOnPage'], ['hostname, ga:pagePath', 'newUsers'], ['hostname, ga:pagePath', 'Users'], ['hostname, ga:pagePath', 'pageviews'], ['hostname, ga:pagePath', 'organicSearches']]
    
     
     print("\n\nProcessing %s..." % name)
@@ -177,10 +179,10 @@ def get_results(service, profile_id, name, account_ID):
     
     
     insert_metric_query = "INSERT INTO GA_Metrics (timestamp, property_ID, description, data, most_recent) VALUES (%s, %s, %s, %s, 1)"
-    insert_dimension_metric_query = "INSERT INTO GA_Dimension_Metrics (timestamp, property_ID, description, dimension_description, data, most_recent) VALUES (%s, %s, %s, %s, %s, 1)"
+    insert_dimension_metric_query = "INSERT INTO GA_Dimension_Metrics (timestamp, property_ID, description, dimension_description, data, most_recent, metric) VALUES (%s, %s, %s, %s, %s, 1, %s)"
    
     insert_metric_query_no_data = "INSERT INTO GA_Metrics (timestamp, property_ID, description, most_recent) VALUES (%s, %s, %s, 1)"
-    insert_dimension_metric_query_no_data = "INSERT INTO GA_Dimension_Metrics (timestamp, property_ID, description, dimension_description, most_recent) VALUES (%s, %s, %s, %s, 1)"
+    insert_dimension_metric_query_no_data = "INSERT INTO GA_Dimension_Metrics (timestamp, property_ID, description, dimension_description, most_recent, metric) VALUES (%s, %s, %s, %s, 1, %s)"
    
     for key in single_keys:
         #print("\tGrab key: %s" % key)  
@@ -229,21 +231,21 @@ def get_results(service, profile_id, name, account_ID):
                 for d in results.get('rows'):
                     #print(d)
                     if len(d) == 2:
-                        dim = d[0]
+                        dim_ = d[0]
                     else:
-                        dim = d[0] + d[1]
+                        dim_ = d[0] + d[1]
                     cnt = d[-1]
-                    print("\t\t%s produced %s %s" % (dim, cnt, metric))
-                    param = [datetime.today(), ID, metric, dim, cnt]
+                    print("\t\t%s produced %s %s" % (dim_, cnt, metric))
+                    param = [datetime.today(), ID, metric, dim_, cnt, dim]
                     print("Query %s w/ %s" % (insert_dimension_metric_query, param))
                     cursor.execute(insert_dimension_metric_query, param)
             else:
                 print("\t\tNo data was returned for %s/%s" % (dim, metric))
-                param = [datetime.today(), ID, metric, dim]
+                param = [datetime.today(), ID, metric, dim, None]
                 print("Query %s w/ %s" % (insert_dimension_metric_query_no_data, param))
                 cursor.execute(insert_dimension_metric_query_no_data, param)
     
-    if True:
+    if commit_stuff:
         mysql_conn.commit()
     else:
         print("\n\nReminder, nothing is being committed...") 
@@ -267,49 +269,52 @@ def print_results(results):
 """
 
 def main():
-  # Define the auth scopes to request.
-  scope = ['https://www.googleapis.com/auth/analytics.readonly']
+    # Define the auth scopes to request.
+    scope = ['https://www.googleapis.com/auth/analytics.readonly']
 
-  # Use the developer console and replace the values with your
-  # service account email and relative location of your key file.
-  service_account_email = open('/home/pi/zack/zackcapozzi_google_api_service_email', 'r').read().strip()
-  key_file_location = '/home/pi/zack/capozziinc-a528d09ee730.json'
-  mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
-  
+    # Use the developer console and replace the values with your
+    # service account email and relative location of your key file.
+    service_account_email = open('/home/pi/zack/zackcapozzi_google_api_service_email', 'r').read().strip()
+    key_file_location = '/home/pi/zack/capozziinc-a528d09ee730.json'
+    mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
 
-	scriptname = "HelloAnalytics"
-	query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
-	param = [scriptname]
-	cursor.execute(query, param)
-	local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read().strip()
-	row = cursor.fetchone()
-	if local_or_remote != row[0]:
-		print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
-		sys.exit()
-  if False: # if True, this will clear the tables prior to running
+
+    scriptname = "HelloAnalytics"
+    query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
+    param = [scriptname]
+    cursor.execute(query, param)
+    local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read().strip()
+    row = cursor.fetchone()
+    if local_or_remote != row[0]:
+        print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
+        sys.exit()
+    if False: # if True, this will clear the tables prior to running
       
-      cursor.execute("TRUNCATE TABLE GA_Metrics")
-      cursor.execute("TRUNCATE TABLE GA_Dimension_Metrics")
+        cursor.execute("TRUNCATE TABLE GA_Metrics")
+        cursor.execute("TRUNCATE TABLE GA_Dimension_Metrics")
       
-  
-  reset_query = "UPDATE GA_Metrics set most_recent=0"
-  reset_query_2 = "UPDATE GA_Dimension_Metrics set most_recent=0"
-  cursor.execute(reset_query)
-  cursor.execute(reset_query_2)
-  mysql_conn.commit(); cursor.close(); mysql_conn.close();
-  
-  # Authenticate and construct service.
-  service = get_service('analytics', 'v3', scope, key_file_location,
+
+    reset_query = "UPDATE GA_Metrics set most_recent=0"
+    reset_query_2 = "UPDATE GA_Dimension_Metrics set most_recent=0"
+    cursor.execute(reset_query)
+    cursor.execute(reset_query_2)
+    if commit_stuff:
+        mysql_conn.commit(); 
+    cursor.close(); mysql_conn.close();
+
+    # Authenticate and construct service.
+    service = get_service('analytics', 'v3', scope, key_file_location,
     service_account_email)
-  #profile = get_first_profile_id(service)
-  #print("Would have used %s" % profile)
-  profiles, names, account_ids = get_all_profiles(service)
-  for p, n, a in zip(profiles, names, account_ids):
-    
-    get_results(service, p, n, a)
-    
+    #profile = get_first_profile_id(service)
+    #print("Would have used %s" % profile)
+    profiles, names, account_ids = get_all_profiles(service)
+    for p, n, a in zip(profiles, names, account_ids):
+
+        get_results(service, p, n, a)
+commit_stuff = True    
 if __name__ == '__main__':
   main()
+  print("\t\n\n\tAll Done!!!")
 """
  def get_results(service, profile_id):
   # Use the Analytics Service Object to query the Core Reporting API

@@ -115,6 +115,8 @@ verified_sites_urls = [s['siteUrl'] for s in site_list['siteEntry']
                        if s['permissionLevel'] != 'siteUnverifiedUser'
                           and s['siteUrl'][:4] == 'http']
 
+time.sleep(60)
+
 wait_delay = 2
 # Printing the URLs of all websites you are verified for.
 
@@ -171,9 +173,14 @@ for site_url in verified_sites_urls:
                     print("%s w/ %s" % (metrics_insert, param))
                     cursor.execute(metrics_insert, param)
                     
+                    
+                    f_ = open('/home/pi/zack/HelloSearchConsole_row_position_log.txt', 'a')
                     param = [datetime.today(), property_ID, 'position', row['position']]
                     print("%s w/ %s" % (metrics_insert, param))
+                    f_.write("%s w/ %s\n" % (metrics_insert, param))
                     cursor.execute(metrics_insert, param)
+                    f_.close()
+                    
             
             # Get top 10 queries for the date range, sorted by click count, descending.
             request = {

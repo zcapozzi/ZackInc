@@ -224,5 +224,16 @@ for handle in res:
     if hr_period != coming_period:
         log_msg("End of session at %s" % (datetime.datetime.today().strftime("%H:%M:%S")))
         break
-    
+
+api = authenticate_me("zack")
+followers = api.get_followers_ids(screen_name = "laxreference")
+mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
+print(followers)
+for follower_id in followers['ids']:
+	query = "INSERT INTO Twitter_Follower_Snapshot (datestamp, twitter_ID) VALUES(%s, %s)"
+	param = [datetime.datetime.today(), follower_id]
+	print("Query %s /w %s" % (query, param))
+	cursor.execute(query, param)
+mysql_conn.commit()
+cursor.close(); mysql_conn.close()
 log_msg("DONE!!!")

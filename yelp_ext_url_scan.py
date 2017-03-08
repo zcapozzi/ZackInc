@@ -58,7 +58,7 @@ def mysql_connect():
             if local_or_remote == "remote":
                 host = "127.0.0.1"
                         
-            print("Connect on %s" % host)
+            #print("Connect on %s" % host)
             cnx = MySQLdb.connect(
                 host=host,
                 port=3306,
@@ -159,16 +159,20 @@ for k, url in enumerate(res):
             time.sleep(1)
     elif k == 10:
         break
-    http = httplib2.Http(timeout=20)
+    http = httplib2.Http(timeout=20, disable_ssl_certificate_validation=True)
     try:
         requests_made += 1
         status, response = http.request(url[0])
         log_msg("Returned a response of length %d" % len(response), no_print=True)
+        
     except httplib.InvalidURL: 
         log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
     except httplib2.SSLHandshakeError: 
         log_msg("SSL Issue with link:\n\t%s\n" % url[0])
+        status = None
+    except httplib.ResponseNotReady: 
+        log_msg("Found an ResponseNotReady Error, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
     except httplib2.ServerNotFoundError: 
         log_msg("ServerNotFound Error with link:\n\t%s\n" % url[0])
@@ -231,14 +235,20 @@ for k, url in enumerate(res):
                     log_msg("\tNo link found...")
                     #print("Query %s w/ %s" % (update_query_not_found, param))
                     cursor.execute(update_query_not_found, param)
-                    cnt_link_not_found += 1
-                    consec_no_link += 1
-                    if consec_no_link == 50:
-                        log_msg("\n\n\t50 consecutive links didn't have an external URL; that's fishy, we're exiting")
-                        sys.exit()
+                    if 'content-length' in status:
+                        cnt_link_not_found += 1
+                        consec_no_link += 1
+                    
+                        f_ = open('/home/pi/zack/yelp_ext_url_scans_response_lengths', 'a')
+                        f_.write("%s,no link\n" % (status['content-length'])); f_.close()
+                        if consec_no_link == 50:
+                            log_msg("\n\n\t50 consecutive links didn't have an external URL; that's fishy, we're exiting")
+                            sys.exit()
                 else:
                     cnt_link_found += 1
                     consec_no_link = 0
+                    f_ = open('/home/pi/zack/yelp_ext_url_scans_response_lengths', 'a')
+                    f_.write("%s,link\n" % (status['content-length'])); f_.close()
                 if True:
                     mysql_conn.commit(); 
                 else:
@@ -249,9 +259,9 @@ for k, url in enumerate(res):
     if hr_period != coming_period:
         log_msg("End of session at %s" % (datetime.datetime.today().strftime("%H:%M:%S")))
         
-        bot, chat_id = setup_telegram()
-        msg = "End of yelp_ext_url_scan session at %s" % (datetime.datetime.today().strftime("%H:%M:%S"))
-        bot.sendMessage(chat_id=chat_id, text=msg)
+        #bot, chat_id = setup_telegram()
+        #msg = "End of yelp_ext_url_scan session at %s" % (datetime.datetime.today().strftime("%H:%M:%S"))
+        #bot.sendMessage(chat_id=chat_id, text=msg)
         log_msg("Done!!!")
         sys.exit()   
 log_msg("Done!!!")

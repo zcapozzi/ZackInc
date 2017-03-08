@@ -158,7 +158,7 @@ for k, url in enumerate(res2):
         log_msg("\tBecause it's the first, we are going to go ahead with  searching %s (%d out of %d)" % (url[0], k+1, len(res)))
     
     start_ms = current_milli_time()
-    http = httplib2.Http(timeout=20)
+    http = httplib2.Http(timeout=20, disable_ssl_certificate_validation=True)
     try:
         requests_made += 1
         status, response = http.request(url[0])
@@ -171,6 +171,9 @@ for k, url in enumerate(res2):
         status = None
     except httplib.IncompleteRead: 
         log_msg("Incomplete read, not sure why this was grabbed as a link\n\t%s\n" % url[0])
+        status = None
+    except httplib.ResponseNotReady: 
+        log_msg("Found an ResponseNotReady Error, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
     except httplib.InvalidURL: 
         log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url[0])

@@ -23,6 +23,9 @@ from socket import error as socket_error
 from subprocess import Popen, PIPE
 
 import clipboard
+sys.path.insert(0, "../ZackInc")
+import zack_inc as zc
+
 
 bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 
@@ -104,19 +107,19 @@ within_two_hour = []
 for r in res:
     flog.write("\tCompare now %s against %s (%s)\n" % (now, r[1], r[3]))
     delta = now - r[1]
-    print("Days apart: %d" % delta.days)
-    print("Seconds apart: %d" % delta.seconds)
+    flog.write("\t\tDays apart: %d\n" % delta.days)
+    flog.write("\t\tSeconds apart: %d\n" % delta.seconds)
     agg = delta.days * 3600*24 + delta.seconds
-    print("Aggregate seconds: %d" % agg)
-    if agg < 60 and agg > 0:
+    flog.write("\t\tAggregate seconds: %d\n" % agg)
+    if agg < 60 and agg >= 0:
         d = {'send_as': r[2], 'tweet': r[3], 'image_path': r[4], 'ID': r[0], 'in_reply_to_ID': None if r[5] == '' else r[5]}
         flog.write("\t\tAdd a tweet to be sent at %s\n" % r[1])
         flog.write("\t\t\tAs %s\n" % d['send_as'])
         flog.write("\t\t\tMsg: %s\n" % d['tweet'])
         to_send.append(d)
-    elif agg > -3600:
+    elif agg > -3600 and agg < 0:
         within_one_hour.append(r[3])
-    elif agg > -7200:
+    elif agg > -7200 and agg < 0:
         within_two_hour.append(r[3])
         
 cursor.close(); mysql_conn.close()
@@ -130,7 +133,7 @@ if len(to_send) == 0:
         for t in within_two_hour:
             flog.write("\t%s\n" % t)
     else:
-        flog.write("\n\nNo Scheduled Tweets to send\n------------------------------\n")
+        flog.write("\n\nNo Scheduled Tweets to send within the next two hours...\n")
     
 else:
     flog.write("\n\nSend %d scheduled tweet(s)\n------------------------------\n" % (len(to_send)))

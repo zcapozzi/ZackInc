@@ -19,6 +19,9 @@ from socket import error as socket_error
 from subprocess import Popen, PIPE
 
 import clipboard
+sys.path.insert(0, "../ZackInc")
+import zack_inc as zc
+
 
 def mysql_connect():
     cnx = None
@@ -230,10 +233,10 @@ followers = api.get_followers_ids(screen_name = "laxreference")
 mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
 print(followers)
 for follower_id in followers['ids']:
-	query = "INSERT INTO Twitter_Follower_Snapshot (datestamp, twitter_ID) VALUES(%s, %s)"
-	param = [datetime.datetime.today(), follower_id]
-	print("Query %s /w %s" % (query, param))
-	cursor.execute(query, param)
+    query = "INSERT INTO Twitter_Follower_Snapshot (datestamp, twitter_ID) VALUES(%s, %s)"
+    param = [datetime.datetime.today(), follower_id]
+    print("Query %s /w %s" % (query, param))
+    cursor.execute(query, param)
 mysql_conn.commit()
 cursor.close(); mysql_conn.close()
 log_msg("DONE!!!")

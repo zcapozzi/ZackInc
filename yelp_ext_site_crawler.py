@@ -17,6 +17,9 @@ from subprocess import Popen, PIPE
 import telegram
 
 import zlib
+sys.path.insert(0, "../ZackInc")
+import zack_inc as zc
+
 
 bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 

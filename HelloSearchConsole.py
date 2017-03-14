@@ -13,6 +13,9 @@ import MySQLdb
 from googleapiclient import sample_tools
 
 from oauth2client.service_account import ServiceAccountCredentials
+sys.path.insert(0, "../ZackInc")
+import zack_inc as zc
+
 
 def mysql_connect():
     cnx = None

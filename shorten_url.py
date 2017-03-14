@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
+sys.path.insert(0, "../ZackInc")
+import zack_inc as zc
+
 
 import requests
 import json

@@ -23,6 +23,9 @@ from socket import error as socket_error
 from subprocess import Popen, PIPE
 
 import clipboard
+sys.path.insert(0, "../ZackInc")
+import zack_inc as zc
+
 
 bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 
@@ -30,26 +33,26 @@ def mysql_connect():
     cnx = None
     try:
         
-		# Connecting from an external network.
-		# Make sure your network is whitelisted
-		#logging.info("Connecting via remote %s..." % app.config['DBNAME'])
-		client_cert_pem = "instance/client_cert_pem"
-		client_key_pem = "instance/client_key_pem"
-		ssl = {'cert': client_cert_pem, 'key': client_key_pem}
-		 
-		host = "169.254.184.34"
-		local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
-		if local_or_remote == "remote":
-			host = "127.0.0.1"
-					
-		print("Connect on %s" % host)
-		cnx = MySQLdb.connect(
-			host=host,
-			port=3306,
-			user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
-		
-		#logging.info("Success = %s" % str(res[0]))
-		response = "Success!"
+        # Connecting from an external network.
+        # Make sure your network is whitelisted
+        #logging.info("Connecting via remote %s..." % app.config['DBNAME'])
+        client_cert_pem = "instance/client_cert_pem"
+        client_key_pem = "instance/client_key_pem"
+        ssl = {'cert': client_cert_pem, 'key': client_key_pem}
+         
+        host = "169.254.184.34"
+        local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
+        if local_or_remote == "remote":
+            host = "127.0.0.1"
+                    
+        print("Connect on %s" % host)
+        cnx = MySQLdb.connect(
+            host=host,
+            port=3306,
+            user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
+        
+        #logging.info("Success = %s" % str(res[0]))
+        response = "Success!"
     except Exception as err:
         response = "Failed."
         print("Connection error: %s" % err)
@@ -103,47 +106,47 @@ tweet = ""
 image_path = ""
 image_yes_no = 0
 if len(args) == 3:
-	image_path = None
-	send_as = args[1]
-	tweet = args[2]
+    image_path = None
+    send_as = args[1]
+    tweet = args[2]
 elif len(args) == 4:
-	image_path = args[3]
-	send_as = args[1]
-	tweet = args[2]
-	image_yes_no = 1
-	if not os.path.isfile(image_path):
-		print("The image you want to tweet was not a valid file name\n---------------------------------------\n\t%s" % image_path)
-		sys.exit()
+    image_path = args[3]
+    send_as = args[1]
+    tweet = args[2]
+    image_yes_no = 1
+    if not os.path.isfile(image_path):
+        print("The image you want to tweet was not a valid file name\n---------------------------------------\n\t%s" % image_path)
+        sys.exit()
 else:
-	print("Invalid arguments Error\n--------------------------\n\tsend_tweet.py [send as] [tweet text] [optional image path]")
-	sys.exit()
+    print("Invalid arguments Error\n--------------------------\n\tsend_tweet.py [send as] [tweet text] [optional image path]")
+    sys.exit()
 
 
 #2 Use [send_as] to authenticate above
 flog.write("#2\n")
 api = authenticate_me(send_as)
 if api is None:
-	print("Authentication failed\n--------------------------\n\tsend_tweet.py [send as] [tweet text] [optional image path]")
-	sys.exit()
-	
-	
+    print("Authentication failed\n--------------------------\n\tsend_tweet.py [send as] [tweet text] [optional image path]")
+    sys.exit()
+    
+    
 #3 Attach image if necessary
 flog.write("#3\n")
 image_ids = None
 if image_path is not None:
-	image_open = open(image_path, 'rb')
-	image_ids = api.upload_media(media=image_open)
+    image_open = open(image_path, 'rb')
+    image_ids = api.upload_media(media=image_open)
 
 #4 Send status/tweet
 flog.write("#4\n")
 for i in range(30):
-	print("Sending %s in %d..." % (tweet, (30-i))); time.sleep(1)
-	
+    print("Sending %s in %d..." % (tweet, (30-i))); time.sleep(1)
+    
 if image_ids is not None:
-	api.update_status(status=tweet, media_ids=image_ids['media_id'])
+    api.update_status(status=tweet, media_ids=image_ids['media_id'])
 else:
-	flog.write("Send tweet: %s\n" % (tweet))
-	api.update_status(status=tweet)
+    flog.write("Send tweet: %s\n" % (tweet))
+    api.update_status(status=tweet)
 api = None
 
 #5 Create record in the database

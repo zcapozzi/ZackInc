@@ -1,4 +1,8 @@
 import time, os, datetime, sys, psutil, random
+
+import zack_inc
+zack_inc.say_hi()
+sys.exit()
 import re
 import MySQLdb
 import subprocess
@@ -102,7 +106,7 @@ def log_msg(s):
    
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 
-
+commit_results = True
 
 scriptname = "download_tweets"
 query = "SELECT local_or_remote from Capozzi_Scripts where name=%s"
@@ -136,14 +140,14 @@ for handle in res:
     per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/download_tweets_parameters', 'r').read()).group(1))
 
     mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
-    query = "Select created_at from Tweets_Captured where created_by=%s and active=1"
+    query = "Select id from Tweets_Captured_Lite where created_by=%s and active=1"
     param = [handle[1]]
     print("Query %s w/ %s" % (query, param))
     cursor.execute(query, param)
     tweets_for_this_user_ = cursor.fetchall()
     tweets_for_this_user = []
     for t in tweets_for_this_user_:
-        tweets_for_this_user.append(t[0])
+        tweets_for_this_user.append(int(t[0]))
     cursor.close(); mysql_conn.close()  
     #print(tweets_for_this_user)
                     
@@ -287,7 +291,14 @@ for handle in res:
                     points.append(tweet['id'])
                     
                     check = dt
-                    if check in tweets_for_this_user:
+                    #print("Look for %d" % tweet['id'])
+                    #print("In\n%s" % str(tweets_for_this_user))
+                    #for t in tweets_for_this_user:
+                    #    print("Is %s == %s" % (tweet['id'], t))
+                    #    if tweet['id'] == t:
+                    #        print("YES!!!!!!!!!!!!")
+                    #       sys.exit()
+                    if tweet['id'] in tweets_for_this_user:
                         #print("Tweet already added to the database...")
                         handle_tweets_already_added += 1
                         already_tweets += 1
@@ -297,22 +308,30 @@ for handle in res:
                         lang = ''
                         if 'lang' in tweet:
                             lang = tweet['lang']
+                        is_retweet = 0
+                        if tweet['text'].startswith("RT"):
+                            is_retweet = 1
                         if 'retweeted_status' in tweet:
-                            query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, lang, entities, retweeted_tweet) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], lang, entities, tweet['retweeted_status']['id']]
+                            query = "INSERT INTO Tweets_Captured_Lite (is_retweet, active, created_at, created_by , id, is_quote_status, retweet_count, favorite_count, in_reply_to_screen_name) VALUES (%s, 1, %s, %s, %s, %s, %s, %s, %s)"
+                            param = [is_retweet, dt, handle[1], tweet['id'], tweet['is_quote_status'], tweet['retweet_count'], tweet['favorite_count'], tweet['in_reply_to_screen_name']]
                         else:
-                            query = "INSERT INTO Tweets_Captured (active, created_at, created_by, text , id, is_quote_status, retweeted, retweet_count , favorited, favorite_count , source , in_reply_to_screen_name, lang, entities) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                            param = [dt, handle[1], text, tweet['id'], tweet['is_quote_status'], tweet['retweeted'], tweet['retweet_count'], tweet['favorited'], tweet['favorite_count'], tweet['source'], tweet['in_reply_to_screen_name'], lang, entities]
+                            query = "INSERT INTO Tweets_Captured_Lite (is_retweet, active, created_at, created_by, id, is_quote_status, retweet_count, favorite_count, in_reply_to_screen_name) VALUES (%s, 1, %s, %s, %s, %s, %s, %s, %s)"
+                            param = [is_retweet, dt, handle[1], tweet['id'], tweet['is_quote_status'], tweet['retweet_count'], tweet['favorite_count'], tweet['in_reply_to_screen_name']]
+                        
                         cursor.execute(query, param)
                         new_tweets += 1
                         handle_tweets_added += 1
                         session_total_new_tweets += 1
-
                         
+                        f = open('/home/pi/zack/Data_Captures/Tweets/%s' % tweet['id'], 'w')
+                        f.write("{'text': %s, 'entities': %s}" % (text, entities))
+                        f.close()
+
+                    #sys.exit()    
                 log_msg("\t\tnew tweets added:     %d" % (new_tweets))
                 log_msg("\t\ttweets already stored: %d" % (already_tweets))
                 
-                if True:
+                if commit_results:
                     mysql_conn.commit(); 
                 else:
                     print("\n\n\tReminder - nothing is being committed...\n\n")
@@ -342,7 +361,12 @@ for handle in res:
             query = "UPDATE Twitter_Accounts set last_twitter_download=%s, total_twitter_downloads=total_twitter_downloads+1 where twitter_handle=%s"
             param = [download_start, handle[1]]
             cursor.execute(query, param)
-            mysql_conn.commit(); cursor.close(); mysql_conn.close()     
+            if commit_results:
+                mysql_conn.commit(); 
+            else:
+                print("\n\n\tReminder - nothing is being committed...\n\n")
+                
+            cursor.close(); mysql_conn.close()     
     else:
         mysql_conn, r = mysql_connect();  mysql_attempts = 0
         while mysql_conn is None and mysql_attempts < 10:
@@ -356,7 +380,12 @@ for handle in res:
         query = "UPDATE Twitter_Accounts set last_twitter_download=%s, total_twitter_downloads=total_twitter_downloads+1 where twitter_handle=%s"
         param = [download_start, twitter_handle]
         cursor.execute(query, param)
-        mysql_conn.commit(); cursor.close(); mysql_conn.close()  
+        if commit_results:
+            mysql_conn.commit(); 
+        else:
+            print("\n\n\tReminder - nothing is being committed...\n\n")
+                
+        cursor.close(); mysql_conn.close()  
 #f.close()
 session_end_time = datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -371,7 +400,12 @@ cursor = mysql_conn.cursor()
 query = "INSERT INTO Twitter_Pull_Sessions (start_time, end_time, accounts_scanned, total_tweets_found, total_new_tweets, scan_auto_sourced_accounts) VALUES (%s, %s, %s, %s, %s, %s)"
 param = [session_start_time, session_end_time, session_accounts_scanned, session_total_tweets_found, session_total_new_tweets, scan_auto_sourced_accounts]
 cursor.execute(query, param)
-mysql_conn.commit(); cursor.close(); mysql_conn.close() 
+if commit_results:
+    mysql_conn.commit(); 
+else:
+    print("\n\n\tReminder - nothing is being committed...\n\n")
+
+cursor.close(); mysql_conn.close() 
 
 log_msg("DONE!!!")
 

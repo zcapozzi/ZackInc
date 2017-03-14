@@ -13,6 +13,9 @@ import yelp
 import urllib2
 
 bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
+sys.path.insert(0, "../ZackInc")
+import zack_inc as zc
+
 
 def setup_telegram():
     # Connect to our bot
@@ -81,58 +84,58 @@ YOUR_TOKEN_SECRET = r4.search(key_data).group(1)
 key_data = None
 
 def get_zips():
-	if os.path.isfile('/home/pi/zack/zip_codes.csv'):
-		zips = open('/home/pi/zack/zip_codes.csv', 'r').read().split("\n")  
-	elif os.path.isfile('/home/pi/zack/14zpallnoagi.csv'):
-		zips = []
-		if True:
-			print("Open file 2...")
-			data = open('/home/pi/zack/14zpallagi.csv', 'r').read().split("\n")
-			print("Process file 2...")
-			for i, d in enumerate(data[1:]):
-				if i % 10000 == 0:
-					print("\t%d / %d @ %s" % (i, len(data), datetime.datetime.today()))
-				#print(d)
-				tokens = d.split(',')
-				if len(tokens) > 2:
-					#print(tokens[2])
-					if tokens[2] not in zips:
-						zips.append(tokens[2])
-		
-		if True:
-			print("Open file 1...")
-			data = open('/home/pi/zack/14zpallnoagi.csv', 'r').read().split("\n")
-			print("Process file 1...")
-			
-			for i, d in enumerate(data[1:]):
-				if i % 3000 == 0:
-					print("\t%d / %d @ %s" % (i, len(data), datetime.datetime.today()))
-				#print(d)
-				tokens = d.split(',')
-				if len(tokens) > 2:
-					#print(tokens[2])
-					if tokens[2] not in zips:
-						zips.append(tokens[2])
-		if True:
-			print("Open file 3...")
-			data = open('/home/pi/zack/rows.csv', 'r').read().split("\n")
-			print("Process file 3...")
-			for i, d in enumerate(data[1:]):
-				if i % 25000 == 0:
-					print("\t%d / %d @ %s" % (i, len(data), datetime.datetime.today()))
-				#print(d)
-				tokens = d.split(',')
-				if len(tokens) > 2:
-					#print(tokens[2])
-					if tokens[2] not in zips:
-						zips.append(tokens[2])
-		print("Found %d total zips..." % (len(zips)))
-		f = open('/home/pi/zack/zip_codes.csv', 'w')
-		for z in zips:
-			f.write("%s\n" % z)
-		f.close()
-		sys.exit()
-	return zips
+    if os.path.isfile('/home/pi/zack/zip_codes.csv'):
+        zips = open('/home/pi/zack/zip_codes.csv', 'r').read().split("\n")  
+    elif os.path.isfile('/home/pi/zack/14zpallnoagi.csv'):
+        zips = []
+        if True:
+            print("Open file 2...")
+            data = open('/home/pi/zack/14zpallagi.csv', 'r').read().split("\n")
+            print("Process file 2...")
+            for i, d in enumerate(data[1:]):
+                if i % 10000 == 0:
+                    print("\t%d / %d @ %s" % (i, len(data), datetime.datetime.today()))
+                #print(d)
+                tokens = d.split(',')
+                if len(tokens) > 2:
+                    #print(tokens[2])
+                    if tokens[2] not in zips:
+                        zips.append(tokens[2])
+        
+        if True:
+            print("Open file 1...")
+            data = open('/home/pi/zack/14zpallnoagi.csv', 'r').read().split("\n")
+            print("Process file 1...")
+            
+            for i, d in enumerate(data[1:]):
+                if i % 3000 == 0:
+                    print("\t%d / %d @ %s" % (i, len(data), datetime.datetime.today()))
+                #print(d)
+                tokens = d.split(',')
+                if len(tokens) > 2:
+                    #print(tokens[2])
+                    if tokens[2] not in zips:
+                        zips.append(tokens[2])
+        if True:
+            print("Open file 3...")
+            data = open('/home/pi/zack/rows.csv', 'r').read().split("\n")
+            print("Process file 3...")
+            for i, d in enumerate(data[1:]):
+                if i % 25000 == 0:
+                    print("\t%d / %d @ %s" % (i, len(data), datetime.datetime.today()))
+                #print(d)
+                tokens = d.split(',')
+                if len(tokens) > 2:
+                    #print(tokens[2])
+                    if tokens[2] not in zips:
+                        zips.append(tokens[2])
+        print("Found %d total zips..." % (len(zips)))
+        f = open('/home/pi/zack/zip_codes.csv', 'w')
+        for z in zips:
+            f.write("%s\n" % z)
+        f.close()
+        sys.exit()
+    return zips
 category_filter = "bakeries"
 params = {
     'term': 'food',

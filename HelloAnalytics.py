@@ -15,6 +15,12 @@ import MySQLdb
 import datetime
 from datetime import datetime
 
+import telegram; bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
+
+sys.path.insert(0, "../ZackInc")
+import zack_inc as zc
+
+
 def get_service(api_name, api_version, scope, key_file_location,
                 service_account_email):
   """Get a service that communicates to a Google API.
@@ -118,7 +124,6 @@ def get_all_profiles(service):
 
   # Get a list of all Google Analytics accounts for this user
   accounts = service.management().accounts().list().execute()
-
   if accounts.get('items'):
     account_ids = []
     ids = []
@@ -163,11 +168,13 @@ def get_results(service, profile_id, name, account_ID):
     single_keys = ['sessions', 'bounces', 'avgSessionDuration', 'users', 'newUsers']
     multiple_keys = [['date', '7dayUsers'], ['date', '14dayUsers'], ['date', '30dayUsers'], 
     ['sourceMedium', 'timeOnPage'], ['sourceMedium', 'newUsers'], ['sourceMedium', 'Users'], ['sourceMedium', 'pageviews'], ['sourceMedium', 'organicSearches'],
-    ['adContent', 'timeOnPage'], ['adContent', 'newUsers'], ['adContent', 'Users'], ['adContent', 'pageviews'], ['adContent', 'organicSearches'],
+    ['adContent', 'timeOnPage'], ['adContent', 'sessions'], ['adContent', 'newUsers'], ['adContent', 'Users'], ['adContent', 'pageviews'], ['adContent', 'organicSearches'],
+    ['adContent, ga:pagePath', 'timeOnPage'], ['adContent, ga:pagePath', 'sessions'], ['adContent, ga:pagePath', 'newUsers'], ['adContent, ga:pagePath', 'Users'], ['adContent, ga:pagePath', 'pageviews'], ['adContent, ga:pagePath', 'organicSearches'],
     ['searchKeyword', 'timeOnPage'], ['searchKeyword', 'newUsers'], ['searchKeyword', 'Users'], ['searchKeyword', 'pageviews'], ['searchKeyword', 'organicSearches'],
     ['searchStartPage', 'timeOnPage'], ['searchStartPage', 'newUsers'], ['searchStartPage', 'Users'], ['searchStartPage', 'pageviews'], ['searchStartPage', 'organicSearches'],
     ['hostname, ga:pagePath', 'timeOnPage'], ['hostname, ga:pagePath', 'newUsers'], ['hostname, ga:pagePath', 'Users'], ['hostname, ga:pagePath', 'pageviews'], ['hostname, ga:pagePath', 'organicSearches']]
    
+    
     
     print("\n\nProcessing %s..." % name)
     mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
@@ -211,7 +218,7 @@ def get_results(service, profile_id, name, account_ID):
                     if len(d) == 2:
                         dim = d[0]
                     else:
-                        dim = d[0] + d[1]
+                        dim = d[0] + " <.> " + d[1]
                     cnt = d[-1]
                     param = [datetime.today(), ID, metric, cnt]
                     print("Query %s w/ %s" % (insert_metric_query, param))
@@ -233,7 +240,7 @@ def get_results(service, profile_id, name, account_ID):
                     if len(d) == 2:
                         dim_ = d[0]
                     else:
-                        dim_ = d[0] + d[1]
+                        dim_ = d[0] + " <.> " + d[1]
                     cnt = d[-1]
                     print("\t\t%s produced %s %s" % (dim_, cnt, metric))
                     param = [datetime.today(), ID, metric, dim_, cnt, dim]
@@ -288,10 +295,10 @@ def main():
     if local_or_remote != row[0]:
         print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
         sys.exit()
-    if False: # if True, this will clear the tables prior to running
+    #if False: # if True, this will clear the tables prior to running
       
-        cursor.execute("TRUNCATE TABLE GA_Metrics")
-        cursor.execute("TRUNCATE TABLE GA_Dimension_Metrics")
+    #    cursor.execute("TRUNCATE TABLE GA_Metrics")
+    #    cursor.execute("TRUNCATE TABLE GA_Dimension_Metrics")
       
 
     reset_query = "UPDATE GA_Metrics set most_recent=0"
@@ -308,13 +315,39 @@ def main():
     #profile = get_first_profile_id(service)
     #print("Would have used %s" % profile)
     profiles, names, account_ids = get_all_profiles(service)
+    
+    property_ID = None
+    if len(sys.argv) > 2:
+        for i in range(1, len(sys.argv)):
+            if sys.argv[i] == '-p':
+                property_ID = sys.argv[i+1]
+    
+  
+  
+  
     for p, n, a in zip(profiles, names, account_ids):
-
-        get_results(service, p, n, a)
+        
+        if property_ID in n or property_ID is None:
+            get_results(service, p, n, a)
 commit_stuff = True    
 if __name__ == '__main__':
-  main()
-  print("\t\n\n\tAll Done!!!")
+    main()
+    print("\t\n\n\tAll Done!!!")
+    bot = telegram.Bot(token=bot_token)
+
+    # Waits for the first incoming message
+    updates=[]
+    while not updates:
+        updates = bot.getUpdates()
+        
+    # Gets the id for the active chat
+
+    chat_id=updates[-1].message.chat_id
+
+    # Sends a message to the chat
+    msg = "Done with Hello Analytics.py"
+    bot.sendMessage(chat_id=chat_id, text=msg)
+    print("Telegram %s" % msg)
 """
  def get_results(service, profile_id):
   # Use the Analytics Service Object to query the Core Reporting API

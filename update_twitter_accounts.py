@@ -12,6 +12,7 @@ sys.setdefaultencoding("utf-8")
 
 from twython import Twython
 from twython import TwythonAuthError, TwythonError
+import telegram; bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 
 import errno
 from socket import error as socket_error
@@ -94,7 +95,12 @@ def authenticate_me(whoami):
     else:
         return None
     return Twython(CONSUMER_KEY, CONSUMER_SECRET, ACCESS_KEY, ACCESS_SECRET)
-current_milli_time = lambda: int(round(time.time() * 1000))    
+
+
+##########################
+commit_results = True  #
+##########################
+ 
 # Create a connection to the database
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 
@@ -126,13 +132,13 @@ def log_msg(s, no_print=False):
     log.close()
 
 total_calls = 1.0
-start_ms = current_milli_time()
+start_ms = zc.current_milli_time()
 
 weekday = datetime.datetime.today().weekday()
 hr_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6)).hour) / 8)
 
 # 3 8-hr periods
-
+updated_accounts = 0
 for handle in res:
     
     
@@ -144,21 +150,21 @@ for handle in res:
     except TwythonAuthError as e:
         if "Twitter API returned a 401 (Unauthorized)" in str(e):
             log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
-            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (zc.current_milli_time() - start_ms)/1000, float(total_calls)/(float(zc.current_milli_time() - start_ms)/60/1000)))
             log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
             log_msg("Error text: %s" % e)
             handle = None
             api = None
         elif "Twitter API returned a 403 (Forbidden), User has been suspended." in str(e):
             log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for suspended handle: %s" % handle[1])
-            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (zc.current_milli_time() - start_ms)/1000, float(total_calls)/(float(zc.current_milli_time() - start_ms)/60/1000)))
             log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
             log_msg("Error text: %s" % e)
             handle = None
             api = None
         else:
             log_msg("1) TwythonAuthError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
-            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (zc.current_milli_time() - start_ms)/1000, float(total_calls)/(float(zc.current_milli_time() - start_ms)/60/1000)))
             log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
             log_msg("Error text: %s" % e)
             handle = None
@@ -166,21 +172,21 @@ for handle in res:
     except TwythonError as e:
         if "Twitter API returned a 401 (Unauthorized)" in str(e):
             log_msg("1) TwythonError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
-            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (zc.current_milli_time() - start_ms)/1000, float(total_calls)/(float(zc.current_milli_time() - start_ms)/60/1000)))
             log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
             log_msg("Error text: %s" % e)
             handle = None
             api = None
         elif "Twitter API returned a 403 (Forbidden), User has been suspended." in str(e):
             log_msg("1) TwythonError Error occurred when trying to capture the tweets for suspended handle: %s" % handle[1])
-            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (zc.current_milli_time() - start_ms)/1000, float(total_calls)/(float(zc.current_milli_time() - start_ms)/60/1000)))
             log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
             log_msg("Error text: %s" % e)
             handle = None
             api = None
         else:
             log_msg("1) TwythonError Error occurred when trying to capture the tweets for handle: %s" % handle[1])
-            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (current_milli_time() - start_ms)/1000, float(total_calls)/(float(current_milli_time() - start_ms)/60/1000)))
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (zc.current_milli_time() - start_ms)/1000, float(total_calls)/(float(zc.current_milli_time() - start_ms)/60/1000)))
             log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
             log_msg("Error text: %s" % e)
             handle = None
@@ -216,8 +222,12 @@ for handle in res:
         cursor.execute(query, param)
         log_msg("Query %s w/ %s" % (query, param))
         tu = None
+        updated_accounts += 1
     
-    mysql_conn.commit(); 
+    if commit_results:
+        mysql_conn.commit()
+    else:
+        print("\n\n\tREMINDER, nothing is being committed!!!!\n\n")
     cursor.close(); mysql_conn.close()     
     
     per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/update_twitter_profile_parameters', 'r').read()).group(1))
@@ -228,15 +238,80 @@ for handle in res:
         log_msg("End of session at %s" % (datetime.datetime.today().strftime("%H:%M:%S")))
         break
 
+
 api = authenticate_me("zack")
-followers = api.get_followers_ids(screen_name = "laxreference")
+follower_count = 0
+next_cursor = -1
+last_cursor = -1
+my_followers = []
+followers_added_to_capture = 0
+while next_cursor:
+    
+    followers = api.get_followers_list(screen_name = "laxreference", count=200)
+    for follower in followers['users']:
+        follower_count += 1
+        print "ID #%s - %s\t\t(%d total)" % (follower['id'], follower['screen_name'], follower_count)
+        d = {'id': follower['id'], 'handle': "@%s" % (follower['screen_name'])}
+        my_followers.append(d)
+    next_cursor = followers['next_cursor']
+    print("Next Cursor: %s (%s)" % (str(next_cursor), next_cursor.__class__))
+    if last_cursor == next_cursor or True:
+        break
+    last_cursor = next_cursor
+    time.sleep(60)
+    
+
+
+check_followed_query1 = "SELECT count(1) from Twitter_Accounts where twitter_handle = %s"
+check_followed_query2 = "SELECT count(1) from Twitter_Accounts where twitter_handle = %s and active=1"
+
 mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
-print(followers)
-for follower_id in followers['ids']:
+for m in my_followers:
+    check_followed_param = [m['handle']]
+    
+    cursor.execute(check_followed_query1, check_followed_param)
+    count = cursor.fetchone()[0]
+    query = None
+    if count == 0:
+        query = "INSERT INTO Twitter_Accounts (ID, twitter_handle, twitter_ID, created_on, active, auto_sourced_as_follower) VALUES ((SELECT count(1)+1 from Twitter_Accounts fds), %s, %s, %s, 1, 1)"
+        param = [m['handle'], m['id'], datetime.datetime.today()]
+        followers_added_to_capture += 1
+    else:
+        cursor.execute(check_followed_query2, check_followed_param)
+        count = cursor.fetchone()[0]
+        if count == 0:
+            query = "UPDATE Twitter_Accounts set active=1 where twitter_handle=%s"
+            param = [m['handle']]
+    if query is not None:
+        print("Query %s w/ %s" % (query, param))
+        cursor.execute(query, param)
+    
     query = "INSERT INTO Twitter_Follower_Snapshot (datestamp, twitter_ID) VALUES(%s, %s)"
-    param = [datetime.datetime.today(), follower_id]
+    param = [datetime.datetime.today(), m['handle']]
     print("Query %s /w %s" % (query, param))
     cursor.execute(query, param)
-mysql_conn.commit()
+print("\n\n\tFound %d total followers.\n\n" % follower_count)
+
+if commit_results:
+    mysql_conn.commit()
+else:
+    print("\n\n\tREMINDER, nothing is being committed!!!!\n\n")
 cursor.close(); mysql_conn.close()
 log_msg("DONE!!!")
+
+bot = telegram.Bot(token=bot_token)
+
+# Waits for the first incoming message
+updates=[]
+while not updates:
+    updates = bot.getUpdates()
+    
+# Gets the id for the active chat
+
+chat_id=updates[-1].message.chat_id
+
+# Sends a message to the chat
+msg = "Done with update_twitter_accounts\n  %s accounts updated\n  %s followers added to tweet capture" % ("{:,}".format(updated_accounts), "{:,}".format(followers_added_to_capture))
+bot.sendMessage(chat_id=chat_id, text=msg)
+print("Telegram %s" % msg)
+

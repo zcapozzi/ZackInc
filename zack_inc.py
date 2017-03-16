@@ -1,4 +1,5 @@
-import time, os, datetime, sys, psutil, random, MySQLdb, statistics
+import time, os, datetime, sys, psutil, random, MySQLdb, statistics, requests, re
+from bs4 import BeautifulSoup
 
 def say_hi():
     print("Hi, I'm ZackInc.py...")
@@ -403,7 +404,7 @@ def get_IL_win_pct():
         IL_teams.append(team)
     return IL_teams
     
-def get_adj_odds(section, adjusted_diff, win_odds, win_odds_ID):
+def get_adj_odds(section, adjusted_diff, win_odds_data, win_odds_ID):
     odds = 0
     loc = 22 + adjusted_diff
     loc = max(0, min(loc, 41))

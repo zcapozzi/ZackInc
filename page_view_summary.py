@@ -67,14 +67,14 @@ if len(sys.argv) > 1:
     for i in range(1, len(sys.argv)):
         if sys.argv[i] == '-no-send':
             send_images = False
-            print("No send"); sys.exit()
+            
             
 metrics = ['pageviews', 'newUsers', 'Users', 'timeOnPage', 'organicSearches']
 weeks_back = 3
 for metric in metrics:
     mysql_conn, response = mysql_connect()
     cursor = mysql_conn.cursor()
-    query = "SELECT dimension_description, data, timestamp from GA_Dimension_Metrics where dimension_description like '%%<.>%%' and description=%s and metric=%s and dimension_description not like '%%wp-%%' and timestamp>STR_TO_DATE(%s, '%%Y-%%m-%%d %%H:%%i:%%s') order by dimension_description asc"
+    query = "SELECT dimension_description, data, timestamp from GA_Dimension_Metrics where dimension_description like '%%<.>%%' and description=%s and metric=%s and dimension_description not like '%%wp-%%' and timestamp>STR_TO_DATE(%s, '%%Y-%%m-%%d %%H:%%i:%%s') order by timestamp asc, dimension_description asc"
     param = [metric, "hostname, ga:pagePath", (datetime.datetime.today()-datetime.timedelta(days=7*weeks_back)).strftime("%Y-%m-%d %H:%M:%S")]
     cursor.execute(query, param)
     res = cursor.fetchall()
@@ -165,21 +165,22 @@ for metric in metrics:
             lgd = ax1.legend(bbox_to_anchor=(0,offset), loc='lower left', ncol=1)
             plt.savefig('/home/pi/zack/%sSummary (%s).png' % (metric.title(), ys_['title']), bbox_extra_artists=(lgd,), bbox_inches='tight'); 
             
-            bot = telegram.Bot(token=bot_token)
+            if send_images:
+                bot = telegram.Bot(token=bot_token)
 
-            # Waits for the first incoming message
-            updates=[]
-            while not updates:
-                updates = bot.getUpdates()
-                
-            # Gets the id for the active chat
+                # Waits for the first incoming message
+                updates=[]
+                while not updates:
+                    updates = bot.getUpdates()
+                    
+                # Gets the id for the active chat
 
-            chat_id=updates[-1].message.chat_id
+                chat_id=updates[-1].message.chat_id
 
-            # Sends a message to the chat
-            #output = StringIO(open(.read())
-            #img = Image.open()
-            bot.sendPhoto(chat_id=chat_id, photo=open('/home/pi/zack/%sSummary (%s).png' % (metric.title(), ys_['title']), 'rb'))
+                # Sends a message to the chat
+                #output = StringIO(open(.read())
+                #img = Image.open()
+                bot.sendPhoto(chat_id=chat_id, photo=open('/home/pi/zack/%sSummary (%s).png' % (metric.title(), ys_['title']), 'rb'))
             
 
         plt.close()     

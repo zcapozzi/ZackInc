@@ -127,8 +127,8 @@ session_total_tweets_found = 0
 session_total_new_tweets = 0
 session_accounts_scanned = 0
 session_start_time = datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S")
-current_milli_time = lambda: int(round(time.time() * 1000))
-start_ms = current_milli_time()
+
+start_ms = zc.current_milli_time()
 total_calls = float(0.0)
 first_call = True
 for handle in res:

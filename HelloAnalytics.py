@@ -326,9 +326,12 @@ def main():
   
   
     for p, n, a in zip(profiles, names, account_ids):
+        if property_ID is None:
         
-        if property_ID in n or property_ID is None:
             get_results(service, p, n, a)
+        else:
+            if property_ID in n:
+                get_results(service, p, n, a)
 commit_stuff = True    
 if __name__ == '__main__':
     main()

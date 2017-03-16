@@ -1,4 +1,4 @@
-import time, os, datetime, sys, psutil, random
+import time, os, datetime, sys, psutil, random, MySQLdb, statistics
 
 def say_hi():
     print("Hi, I'm ZackInc.py...")
@@ -8,6 +8,8 @@ def translate_event_type(p, pd, full_detail):
         e = "???"
         p = p.lower()
         pd = pd.lower().strip()
+        if pd.endswith("<"):
+            pd = pd[0:-1]
         if (p == "clear attempt" or (p.startswith("[") and "clear attempt" in p)) and pd == "good.":
             e = "Good Clear"
         elif p == "clear attempt" and pd == "failed.":
@@ -38,6 +40,8 @@ def translate_event_type(p, pd, full_detail):
             e = "Ground Ball"
         elif p.startswith("faceoff"):
             e = "Faceoff Win"
+        elif p == "foul":
+            e = "Penalty - 30 sec"
         elif p == "penalty" and "too many players/0:00" in pd:
             e = "Penalty - 30 sec"
         elif p == "penalty" and "offside/0:00" in pd:
@@ -49,6 +53,8 @@ def translate_event_type(p, pd, full_detail):
         elif p == "penalty" and "2:00" in pd:
             e = "Penalty - 2 min"
         elif p == "penalty" and "3:00" in pd:
+            e = "Penalty - 3 min"
+        elif p == "red card":
             e = "Penalty - 3 min"
         elif "at goalie" in p:
             e = "Goalie Change"
@@ -158,7 +164,7 @@ def translate_confirmed_teams(home_team_full, away_team_full, alt_team1, alt_tea
 def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
     print("Translate Alt Teams\n-----------------------------\n\t Home team full: %s\n\t Away Team Full: %s\n\t Alt Team 1: %s\n\t Alt Team 2: %s\n" % (home_team_full, away_team_full, alt_team1, alt_team2))
     mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
-    query = "SELECT home_team, count(1) from LaxRef_Games where home_team=%s group by home_team order by 2 desc"
+    query = "SELECT home_team, count(1) from LaxRef_Games where not isnull(home_team) and home_team=%s group by home_team order by 2 desc"
     param = [alt_team1]
     #print("\nQuery %s w/ %s" % (query, param))
     cursor.execute(query, param)
@@ -174,7 +180,7 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
             home_teams.append(r[0])
             home_team_counts.append(0)
         home_team_counts[home_teams.index(r[0])] += r[1]
-    query = "SELECT home_team, count(1) from LaxRef_Games where home_team=%s group by home_team order by 2 desc"
+    query = "SELECT confirmed_home_team, count(1) from LaxRef_Games where not isnull(confirmed_home_team) and  home_team=%s group by confirmed_home_team order by 2 desc"
     param = [alt_team2]
     #print("\nQuery %s w/ %s" % (query, param))
     cursor.execute(query, param)
@@ -186,7 +192,19 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
             away_teams.append(r[0])
             away_team_counts.append(0)
         away_team_counts[away_teams.index(r[0])] += r[1]
-    query = "SELECT home_team, count(1) from LaxRef_Games where alt_home_team=%s group by home_team order by 2 desc"
+    query = "SELECT home_team, count(1) from LaxRef_Games where not isnull(home_team) and  home_team=%s group by home_team order by 2 desc"
+    param = [alt_team2]
+    #print("\nQuery %s w/ %s" % (query, param))
+    cursor.execute(query, param)
+    res = cursor.fetchall()
+    #print("Alt Team 2 Home Team Options\n---------------------------------")
+    for r in res:
+        #print("%s - %d" % (r[0], r[1]))
+        if r[0] not in away_teams:
+            away_teams.append(r[0])
+            away_team_counts.append(0)
+        away_team_counts[away_teams.index(r[0])] += r[1]
+    query = "SELECT home_team, count(1) from LaxRef_Games where not isnull(home_team) and  alt_home_team=%s group by home_team order by 2 desc"
     param = [alt_team1]
     #print("\nQuery %s w/ %s" % (query, param))
     cursor.execute(query, param)
@@ -199,7 +217,7 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
             home_teams.append(r[0])
             home_team_counts.append(0)
         home_team_counts[home_teams.index(r[0])] += r[1]
-    query = "SELECT home_team, count(1) from LaxRef_Games where alt_home_team=%s group by home_team order by 2 desc"
+    query = "SELECT home_team, count(1) from LaxRef_Games where not isnull(home_team) and  alt_home_team=%s group by home_team order by 2 desc"
     param = [alt_team2]
     #print("\nQuery %s w/ %s" % (query, param))
     cursor.execute(query, param)
@@ -211,7 +229,43 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
             away_teams.append(r[0])
             away_team_counts.append(0)
         away_team_counts[away_teams.index(r[0])] += r[1]
-    query = "SELECT alt_home_team, count(1) from LaxRef_Games where home_team=%s group by alt_home_team order by 2 desc"
+    query = "SELECT confirmed_home_team, count(1) from LaxRef_Games where not isnull(confirmed_home_team) and  alt_home_team=%s group by confirmed_home_team order by 2 desc"
+    param = [alt_team2]
+    #print("\nQuery %s w/ %s" % (query, param))
+    cursor.execute(query, param)
+    res = cursor.fetchall()
+    #print("Alt Team 4 Home Team Options\n---------------------------------")
+    for r in res:
+        #print("%s - %d" % (r[0], r[1]))
+        if r[0] not in away_teams:
+            away_teams.append(r[0])
+            away_team_counts.append(0)
+        away_team_counts[away_teams.index(r[0])] += r[1]
+    query = "SELECT confirmed_home_team, count(1) from LaxRef_Games where not isnull(confirmed_home_team) and  alt_home_team=%s group by confirmed_home_team order by 2 desc"
+    param = [alt_team1]
+    #print("\nQuery %s w/ %s" % (query, param))
+    cursor.execute(query, param)
+    res = cursor.fetchall()
+    #print("Alt Team 4 Home Team Options\n---------------------------------")
+    for r in res:
+        #print("%s - %d" % (r[0], r[1]))
+        if r[0] not in home_teams:
+            home_teams.append(r[0])
+            home_team_counts.append(0)
+        home_team_counts[home_teams.index(r[0])] += r[1]
+    query = "SELECT confirmed_home_team, count(1) from LaxRef_Games where not isnull(confirmed_home_team) and  alt_home_team=%s group by confirmed_home_team order by 2 desc"
+    param = [alt_team1]
+    #print("\nQuery %s w/ %s" % (query, param))
+    cursor.execute(query, param)
+    res = cursor.fetchall()
+    #print("Alt Team 4 Home Team Options\n---------------------------------")
+    for r in res:
+        #print("%s - %d" % (r[0], r[1]))
+        if r[0] not in home_teams:
+            home_teams.append(r[0])
+            home_team_counts.append(0)
+        home_team_counts[home_teams.index(r[0])] += r[1]
+    query = "SELECT alt_home_team, count(1) from LaxRef_Games where not isnull(alt_home_team) and  home_team=%s group by alt_home_team order by 2 desc"
     param = [alt_team2]
     #print("\nQuery %s w/ %s" % (query, param))
     cursor.execute(query, param)
@@ -224,7 +278,7 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
             away_team_counts.append(0)
         away_team_counts[away_teams.index(r[0])] += r[1]
     
-    query = "SELECT away_team, count(1) from LaxRef_Games where away_team=%s group by away_team order by 2 desc"
+    query = "SELECT away_team, count(1) from LaxRef_Games where not isnull(away_team) and  away_team=%s group by away_team order by 2 desc"
     param = [alt_team1]
     #print("\nQuery %s w/ %s" % (query, param))
     cursor.execute(query, param)
@@ -236,7 +290,7 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
             home_teams.append(r[0])
             home_team_counts.append(0)
         home_team_counts[home_teams.index(r[0])] += r[1]
-    query = "SELECT away_team, count(1) from LaxRef_Games where away_team=%s group by away_team order by 2 desc"
+    query = "SELECT away_team, count(1) from LaxRef_Games where not isnull(away_team) and  away_team=%s group by away_team order by 2 desc"
     param = [alt_team2]
     #print("\nQuery %s w/ %s" % (query, param))
     cursor.execute(query, param)
@@ -248,7 +302,7 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
             away_teams.append(r[0])
             away_team_counts.append(0)
         away_team_counts[away_teams.index(r[0])] += r[1]
-    query = "SELECT away_team, count(1) from LaxRef_Games where alt_away_team=%s group by away_team order by 2 desc"
+    query = "SELECT away_team, count(1) from LaxRef_Games where not isnull(away_team) and  alt_away_team=%s group by away_team order by 2 desc"
     param = [alt_team1]
     #print("\nQuery %s w/ %s" % (query, param))
     cursor.execute(query, param)
@@ -260,7 +314,7 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
             home_teams.append(r[0])
             home_team_counts.append(0)
         home_team_counts[home_teams.index(r[0])] += r[1]
-    query = "SELECT away_team, count(1) from LaxRef_Games where alt_away_team=%s group by away_team order by 2 desc"
+    query = "SELECT away_team, count(1) from LaxRef_Games where not isnull(away_team) and  alt_away_team=%s group by away_team order by 2 desc"
     param = [alt_team2]
     #print("\nQuery %s w/ %s" % (query, param))
     cursor.execute(query, param)
@@ -272,7 +326,7 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
             away_teams.append(r[0])
             away_team_counts.append(0)
         away_team_counts[away_teams.index(r[0])] += r[1]
-    query = "SELECT alt_away_team, count(1) from LaxRef_Games where away_team=%s group by alt_away_team order by 2 desc"
+    query = "SELECT alt_away_team, count(1) from LaxRef_Games where not isnull(alt_away_team) and  away_team=%s group by alt_away_team order by 2 desc"
     param = [alt_team2]
     #print("\nQuery %s w/ %s" % (query, param))
     cursor.execute(query, param)
@@ -288,26 +342,26 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2):
     
     alt_away_team = None
     alt_home_team = None
-    #print("Alt Team 2 Options\n---------------------------------")
+    print("Alt Team 2 Options\n---------------------------------")
     for team, count in zip(away_teams, away_team_counts):
-        #print("%s - %d" % (team, count))
-        if team == home_team_full:
+        print("%s - %d" % (team, count))
+        if team.title() == home_team_full.title():
             alt_home_team = alt_team2
             #print("Because %s matched %s, set the alt_home_team to %s" % (team, home_team_full, alt_home_team))
             break
-        if team == away_team_full:
+        if team.title() == away_team_full.title():
             alt_away_team = alt_team2
             #print("Because %s matched %s, set the alt_away_team to %s" % (team, away_team_full, alt_away_team))
             break
         
-    #print("Alt Team 1 Options\n---------------------------------")
+    print("Alt Team 1 Options\n---------------------------------")
     for team, count in zip(home_teams, home_team_counts):
-        #print("%s - %d" % (team, count))
-        if team == home_team_full:
+        print("%s - %d" % (team, count))
+        if team.title() == home_team_full.title():
             alt_home_team = alt_team1
             #print("Because %s matched %s, set the alt_home_team to %s" % (team, home_team_full, alt_home_team))
             break
-        if team == away_team_full:
+        if team.title() == away_team_full.title():
             alt_away_team = alt_team1
             #print("Because %s matched %s, set the alt_away_team to %s" % (team, away_team_full, alt_away_team))
             break
@@ -382,3 +436,60 @@ def get_adj_odds(section, adjusted_diff, win_odds, win_odds_ID):
     else:
         return  -1
 
+current_milli_time = lambda: int(round(time.time() * 1000))
+
+def get_tracking_name(tracking_code, cursor):
+    query = "SELECT twitter_handle from GA_Tracking_Tags where RTRIM(LTRIM(campaign_content))=%s"
+    param = [tracking_code.strip()]
+    print("Query %s w/ %s" % (query, param))
+    cursor.execute(query, param)
+    r = cursor.fetchone()
+    if r is None:
+        if tracking_code != "(not set)":
+            print("Returned nothing for %s" % tracking_code)
+        return tracking_code
+    else:
+        return r[0]
+        
+def get_url_title(url, cursor):
+
+    query = "SELECT title from LaxRef_Articles where (url=%s or url=%s or url=%s) and active=1"
+    param = ["http://lacrossereference.com%s" % url, "http://lacrossereference.com%s" % url[0:-1], "http://lacrossereference.com%s/" % url]
+    #print("Query %s w/ %s" % (query, param))
+    cursor.execute(query, param)
+    r = cursor.fetchone()
+    if r is None:
+        return url
+    else:
+        return r[0]
+
+# Connect to Lacrosse Reference Database
+def mysql_connect():
+    cnx = None
+    try:
+        if True:
+            # Connecting from an external network.
+            # Make sure your network is whitelisted
+            #logging.info("Connecting via remote %s..." % app.config['DBNAME'])
+            client_cert_pem = "instance/client_cert_pem"
+            client_key_pem = "instance/client_key_pem"
+            ssl = {'cert': client_cert_pem, 'key': client_key_pem}
+                        
+            host = "169.254.184.34"
+            local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
+            if local_or_remote == "remote":
+                host = "127.0.0.1"
+                        
+            #print("Connect on %s" % host)
+            cnx = MySQLdb.connect(
+                host='77.104.146.71',
+                port=3306,
+                user='lacross9_zcuser', passwd='laxref101', db='lacross9_db101kozc', charset="utf8", use_unicode=True)
+            
+            #logging.info("Success = %s" % str(res[0]))
+            response = "Success!"
+    except Exception as err:
+        response = "Failed."
+        print("Connection error: %s" % err)
+        
+    return cnx, response

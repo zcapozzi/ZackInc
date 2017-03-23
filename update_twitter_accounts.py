@@ -177,6 +177,13 @@ for handle in res:
             log_msg("Error text: %s" % e)
             handle = None
             api = None
+        elif "Twitter API returned a 404 (Not Found), User not found." in str(e):
+            log_msg("1) TwythonError Error occurred when trying to capture the tweets for suspended handle: %s" % handle[1])
+            log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (zc.current_milli_time() - start_ms)/1000, float(total_calls)/(float(zc.current_milli_time() - start_ms)/60/1000)))
+            log_msg("@ error, Per Call Delay: %d" % (per_call_delay))
+            log_msg("Error text: %s" % e)
+            handle = None
+            api = None
         elif "Twitter API returned a 403 (Forbidden), User has been suspended." in str(e):
             log_msg("1) TwythonError Error occurred when trying to capture the tweets for suspended handle: %s" % handle[1])
             log_msg("Total Calls: %d\tOver %d seconds\t%.1f calls/min." % (total_calls, (zc.current_milli_time() - start_ms)/1000, float(total_calls)/(float(zc.current_milli_time() - start_ms)/60/1000)))

@@ -1,8 +1,7 @@
 import time, os, datetime, sys, psutil, random
 
 import zack_inc
-zack_inc.say_hi()
-sys.exit()
+
 import re
 import MySQLdb
 import subprocess

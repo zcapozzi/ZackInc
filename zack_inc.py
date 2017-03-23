@@ -1,5 +1,6 @@
 import time, os, datetime, sys, psutil, random, MySQLdb, statistics, requests, re
 from bs4 import BeautifulSoup
+import imageio
 
 def say_hi():
     print("Hi, I'm ZackInc.py...")
@@ -11,13 +12,15 @@ def translate_event_type(p, pd, full_detail):
         pd = pd.lower().strip()
         if pd.endswith("<"):
             pd = pd[0:-1]
+        if p.strip() == "2-point shot":
+            p = "shot"
         if (p == "clear attempt" or (p.startswith("[") and "clear attempt" in p)) and pd == "good.":
             e = "Good Clear"
         elif p == "clear attempt" and pd == "failed.":
             e = "Failed Clear"
         elif p == "shot" and " save " in pd:
             e = "Saved Shot"
-        elif p == "shot" and (" wide " in pd or pd.endswith(" wide.")  or pd.endswith(" wide") or pd.endswith(" high.") or pd.endswith(" high")):
+        elif p == "shot" and (" wide " in pd or pd.endswith(" wide.") or pd.endswith(" missed.")  or pd.endswith(" wide") or pd.endswith(" high.") or pd.endswith(" high")):
             e = "Missed Shot"
         elif p == "shot" and (pd.endswith(" blocked.") or pd.endswith(" blocked") or " blocked {" in pd):
             e = "Blocked Shot"
@@ -494,3 +497,33 @@ def mysql_connect():
         print("Connection error: %s" % err)
         
     return cnx, response
+
+def gif(data_dict, filter_teams, filename):
+    fig = plt.figure()
+    ax1 = fig.add_axes((.1, .2, .8, .7))
+    ax1.set_title("%s - %s" % (metric.title(), ys_['title']), loc='left')
+    ax1.set_ylabel("# of %s" % metric.title())
+    ax1.set_prop_cycle(cycler('color', ['r', 'g', 'b', 'y', 'c', 'm', 'k']))
+    
+    fontP = FontProperties()
+    fontP.set_size('small')
+    series = 0
+    for y_, u in zip(ys_['vals'], urls):
+        if sum(y_) > 0:
+            print("For %s \n\tPlot %s vs \n\t%s" % (zc.get_url_title(u, cursor), str(x_dates), str(y_)))
+            ax1.plot(x_dates, y_, label=zc.get_url_title(u, cursor), linewidth=2.0)
+            series += 1
+    if series > 0:
+        plt.xticks(x_dates, dates)
+        #ax1.legend(loc='best')
+        #print("Shift it
+        offset = -.3 - .04*series
+        # -.50 is good for 5
+        # -.70 is good for 10
+        lgd = ax1.legend(bbox_to_anchor=(0,offset), loc='lower left', ncol=1)
+        plt.savefig('/home/pi/zack/%sSummary (%s).png' % (metric.title(), ys_['title']), bbox_extra_artists=(lgd,), bbox_inches='tight'); 
+
+
+    plt.close() 
+    for d in data_dict:
+        continue    

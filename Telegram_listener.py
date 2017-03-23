@@ -21,7 +21,8 @@ from socket import error as socket_error
 import ssl
 from subprocess import Popen, PIPE
 
-import telegram;
+import telegram
+import telegram.error
 
 import zlib
 sys.path.insert(0, "../ZackInc")
@@ -67,80 +68,77 @@ start_hour = datetime.datetime.now().hour
 chat_id = None
 ids = []
 
-        
-updates = bot.getUpdates()
-    
-for u in updates:
-    
-    msg = u['message']
-    if msg['message_id'] not in ids:
-        ids.append(msg['message_id'])
-        
-if chat_id is None:
-        chat_id=updates[-1].message.chat_id
-
-last_text = None
-while start_hour == datetime.datetime.now().hour:
-    
+while len(updates) == 0 and start_hour == datetime.datetime.now().hour:        
     updates = bot.getUpdates()
-    
+    time.sleep(1)
+
+if len(updates) > 0:
     for u in updates:
         
         msg = u['message']
         if msg['message_id'] not in ids:
             ids.append(msg['message_id'])
-            text = msg['text'].strip()
-            if text.lower().strip() == "last":
-                text = last_text
-                print("Re-process the last request...")
-            sent_at = msg['date']
-            sent_by = msg['from_user']['first_name']
-            print("\n\n>> %s\n\n" % sent_by)
-            print("At %s, %s sent '%s'" % (sent_at, sent_by, text))
-            return_msg = None
-            if sent_by == 'Zack':
-                if text.lower().startswith('backup'):
-                    if "lacrosse" in text.lower()[6:].strip():
-                        args = ['/home/pi/zack/backup_lacrosse_reference.sh', '&']
-                        print(args)
-                        proc = subprocess.Popen(args, stdout=subprocess.PIPE)
-                elif text.lower().startswith("add twitter"):
-                    mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor();
-                    tokens = text.split(" ")
-                    twitter_handle = tokens[2]
-                    if not twitter_handle.startswith("@"):
-                        twitter_handle = "@" + twitter_handle
-                    
-                    query = "SELECT count(1) from Twitter_Accounts where twitter_handle=%s and active=1"
-                    param = [twitter_handle]
-                    cursor.execute(query, param)
-                    r = cursor.fetchone()
-                    if r[0] > 0:
-                        return_msg = "Twitter handle already followed."
-                    else:
-                        classification1 = ""
-                        if len(tokens) > 3:
-                            classification1 = tokens[3]
-                        
-                        follow_mentioned_accounts = 0
-                        query = "INSERT INTO Twitter_Accounts (ID, name, probable_twitter_handle, twitter_handle, twitter_ID, twitter_verified, created_on, last_twitter_download, daily_tweets, last_twitter_search, last_twitter_peer_search, active, total_twitter_downloads, auto_sourced_via_mention, auto_sourced_via_mention_account, follow_mentioned_accounts, classification1, yelp_listing_ID) "
-                        query += "VALUES ((SELECT count(1) + 1 from Twitter_Accounts fd), '', '', %s, '', 0, %s, '1900-01-01 01:00:00', 0, '1900-01-01 01:00:00', '1900-01-01 01:00:00', 1, 0, 0, '', %s, %s, '')"
-                        param = [twitter_handle, datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"), follow_mentioned_accounts, classification1]
-                        cursor.execute(query, param)
-                        return_msg = "%s has been added w/ classification='%s'." % (twitter_handle, classification1)
-                        mysql_conn.commit()    
-                    cursor.close(); mysql_conn.close()
-            if return_msg is not None:
-                bot.sendMessage(chat_id=chat_id, text=return_msg)
-            last_text = text
-                        
-    time.sleep(3)    
+            
+    if chat_id is None:
+            chat_id=updates[-1].message.chat_id
+
+    last_text = None
+    while start_hour == datetime.datetime.now().hour:
         
-    #sys.exit()
-
-if False:
-    # Gets the id for the active chat
-    chat_id=updates[-1].message.chat_id
-
-    # Sends a message to the chat
-    bot.sendMessage(chat_id=chat_id, text=return_msg)
+        try:
+            updates = bot.getUpdates()
+        except telegram.error.TimeOut as e:
+            print("Bot timed out, waiting 10 seconds...")
+            time.sleep(10)
+            updates = []
+        for u in updates:
+            
+            msg = u['message']
+            if msg['message_id'] not in ids:
+                ids.append(msg['message_id'])
+                text = msg['text'].strip()
+                if text.lower().strip() == "last":
+                    text = last_text
+                    print("Re-process the last request...")
+                sent_at = msg['date']
+                sent_by = msg['from_user']['first_name']
+                print("\n\n>> %s\n\n" % sent_by)
+                print("At %s, %s sent '%s'" % (sent_at, sent_by, text))
+                return_msg = None
+                if sent_by == 'Zack':
+                    if text.lower().startswith('backup'):
+                        if "lacrosse" in text.lower()[6:].strip():
+                            args = ['/home/pi/zack/backup_lacrosse_reference.sh', '&']
+                            print(args)
+                            proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+                    elif text.lower().startswith("add twitter"):
+                        mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor();
+                        tokens = text.split(" ")
+                        twitter_handle = tokens[2]
+                        if not twitter_handle.startswith("@"):
+                            twitter_handle = "@" + twitter_handle
+                        
+                        query = "SELECT count(1) from Twitter_Accounts where twitter_handle=%s and active=1"
+                        param = [twitter_handle]
+                        cursor.execute(query, param)
+                        r = cursor.fetchone()
+                        if r[0] > 0:
+                            return_msg = "Twitter handle already followed."
+                        else:
+                            classification1 = ""
+                            if len(tokens) > 3:
+                                classification1 = tokens[3]
+                            
+                            follow_mentioned_accounts = 0
+                            query = "INSERT INTO Twitter_Accounts (ID, name, probable_twitter_handle, twitter_handle, twitter_ID, twitter_verified, created_on, last_twitter_download, daily_tweets, last_twitter_search, last_twitter_peer_search, active, total_twitter_downloads, auto_sourced_via_mention, auto_sourced_via_mention_account, follow_mentioned_accounts, classification1, yelp_listing_ID) "
+                            query += "VALUES ((SELECT count(1) + 1 from Twitter_Accounts fd), '', '', %s, '', 0, %s, '1900-01-01 01:00:00', 0, '1900-01-01 01:00:00', '1900-01-01 01:00:00', 1, 0, 0, '', %s, %s, '')"
+                            param = [twitter_handle, datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"), follow_mentioned_accounts, classification1]
+                            cursor.execute(query, param)
+                            return_msg = "%s has been added w/ classification='%s'." % (twitter_handle, classification1)
+                            mysql_conn.commit()    
+                        cursor.close(); mysql_conn.close()
+                if return_msg is not None:
+                    bot.sendMessage(chat_id=chat_id, text=return_msg)
+                last_text = text
+                            
+        time.sleep(3)    

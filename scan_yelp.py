@@ -2,7 +2,7 @@ import time, os, datetime, sys, psutil
 import re
 import MySQLdb
 import subprocess
-import telegram
+import telepot
 
 from subprocess import Popen, PIPE
 
@@ -13,22 +13,22 @@ import yelp
 import urllib2
 
 bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
-sys.path.insert(0, "../ZackInc")
+sys.path.insert(0, "/home/pi/zack/ZackInc")
 import zack_inc as zc
 
 
-def setup_telegram():
+def setup_telepot():
     # Connect to our bot
-    bot = telegram.Bot(token=bot_token)
+    bot = telepot.Bot(token=bot_token)
 
     # Waits for the first incoming message
     updates=[]
     while not updates:
         updates = bot.getUpdates()
-        
+
     # Gets the id for the active chat
     #print updates[-1].message.text
-    chat_id=updates[-1].message.chat_id
+    chat_id=updates[-1]['message']['chat']['id']
 
     return bot, chat_id
 
@@ -50,24 +50,24 @@ def mysql_connect():
             client_cert_pem = "instance/client_cert_pem"
             client_key_pem = "instance/client_key_pem"
             ssl = {'cert': client_cert_pem, 'key': client_key_pem}
-                        
+
             host = "169.254.184.34"
             local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
             if local_or_remote == "remote":
                 host = "127.0.0.1"
-                        
+
             #print("Connect on %s" % host)
             cnx = MySQLdb.connect(
                 host=host,
                 port=3306,
                 user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
-            
+
             #logging.info("Success = %s" % str(res[0]))
             response = "Success!"
     except Exception as err:
         response = "Failed."
         print("Connection error: %s" % err)
-        
+
     return cnx, response
 
 initial_loop = True
@@ -85,7 +85,7 @@ key_data = None
 
 def get_zips():
     if os.path.isfile('/home/pi/zack/zip_codes.csv'):
-        zips = open('/home/pi/zack/zip_codes.csv', 'r').read().split("\n")  
+        zips = open('/home/pi/zack/zip_codes.csv', 'r').read().split("\n")
     elif os.path.isfile('/home/pi/zack/14zpallnoagi.csv'):
         zips = []
         if True:
@@ -101,12 +101,12 @@ def get_zips():
                     #print(tokens[2])
                     if tokens[2] not in zips:
                         zips.append(tokens[2])
-        
+
         if True:
             print("Open file 1...")
             data = open('/home/pi/zack/14zpallnoagi.csv', 'r').read().split("\n")
             print("Process file 1...")
-            
+
             for i, d in enumerate(data[1:]):
                 if i % 3000 == 0:
                     print("\t%d / %d @ %s" % (i, len(data), datetime.datetime.today()))
@@ -196,7 +196,7 @@ row = cursor.fetchone()
 if local_or_remote != row[0]:
     print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
     sys.exit()
-    
+
 query = "SELECT ID from Data_Capture_Campaigns where name like '%Yelp%' and active=1"
 cursor.execute(query)
 data_campaign_IDs = cursor.fetchall()
@@ -260,12 +260,12 @@ for data_campaign_ID in data_campaign_IDs:
                 if mysql_conn is None:
                         log_msg("Could not connect to MySQL after 10 tries...exiting.")
                         sys.exit()
-                        
+
                 cursor = mysql_conn.cursor()
                 cursor.execute("SET collation_connection='utf8_general_ci'")
                 cursor.execute("ALTER DATABASE monoprice CHARACTER SET utf8 COLLATE utf8_general_ci")
                 cursor.execute("ALTER TABLE Yelp_Listings CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci")
-            
+
                 print("Being a good internet citizen and waiting for %d seconds before searching %s" % (per_call_delay, zip_code))
                 time.sleep(per_call_delay)
                 try:
@@ -280,19 +280,19 @@ for data_campaign_ID in data_campaign_IDs:
                 except yelp.errors.InternalError as e:
                     s = None
                     log_msg("\t500 Internal Server error for location: %s (%s)" % (zip_code, e))
-                    
+
                 except ValueError as e:
                     s = None
                     log_msg("\tValue Error error for location: %s (%s)" % (zip_code, e))
-                    
+
                 except yelp.errors.InvalidSignature as e:
                     s = None
                     log_msg("\tInvalidSignature error for location: %s (%s)" % (zip_code, e))
-                    
+
                 except urllib2.URLError as e:
                     s = None
                     log_msg("\turllib2.URLError error for location: %s (%s)" % (zip_code, e))
-                    
+
                 except yelp.errors.UnavailableForLocation:
                     s = None
                     log_msg("\tNo API access for location: %s" % (zip_code))
@@ -333,7 +333,7 @@ for data_campaign_ID in data_campaign_IDs:
                             cursor.execute(insert_query, insert_param)
                             new_listings += 1
                         else:
-                            print("\t\tAlready stored in the DB...")    
+                            print("\t\tAlready stored in the DB...")
                     for i, l in enumerate(s2.businesses):
                         log_msg(l, no_print=True)
                         try:
@@ -355,17 +355,17 @@ for data_campaign_ID in data_campaign_IDs:
                             #print("\t\tExecute %s w/ %s" % (insert_query, insert_param))
                             cursor.execute(insert_query, insert_param)
                             new_listings += 1
-                            mysql_conn.commit(); 
+                            mysql_conn.commit();
                         else:
                             print("\t\tAlready stored in the DB...")
-                            
+
                     print("Added %d new listing(s)..." % new_listings)
                 cursor.close(); mysql_conn.close()
         coming_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6) + datetime.timedelta(minutes=15)).hour) / 8)
         if hr_period != coming_period:
             log_msg("End of session at %s" % (datetime.datetime.today().strftime("%H:%M:%S")))
-            
-            #bot, chat_id = setup_telegram()
+
+            #bot, chat_id = setup_telepot()
             #msg = "End of scan_yelp session at %s" % (datetime.datetime.today().strftime("%H:%M:%S"))
             #bot.sendMessage(chat_id=chat_id, text=msg)
             log_msg("Done!!!")

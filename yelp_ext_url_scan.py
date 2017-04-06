@@ -2,7 +2,7 @@ import time, os, datetime, sys, psutil, random
 import re
 import MySQLdb
 import subprocess
-import telegram
+import telepot
 import requests
 import httplib2, httplib
 from BeautifulSoup import BeautifulSoup, SoupStrainer
@@ -15,28 +15,28 @@ import ssl
 from subprocess import Popen, PIPE
 
 import clipboard
-sys.path.insert(0, "../ZackInc")
+sys.path.insert(0, "/home/pi/zack/ZackInc")
 import zack_inc as zc
 
 
 bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 
-def setup_telegram():
+def setup_telepot():
     # Connect to our bot
-    bot = telegram.Bot(token=bot_token)
+    bot = telepot.Bot(token=bot_token)
 
     # Waits for the first incoming message
     updates=[]
     while not updates:
         updates = bot.getUpdates()
-        
+
     # Gets the id for the active chat
     #print updates[-1].message.text
-    chat_id=updates[-1].message.chat_id
+    chat_id=updates[-1]['message']['chat']['id']
 
 
     return bot, chat_id
-    
+
 def mysql_connect():
     cnx = None
     try:
@@ -55,24 +55,24 @@ def mysql_connect():
             client_cert_pem = "instance/client_cert_pem"
             client_key_pem = "instance/client_key_pem"
             ssl = {'cert': client_cert_pem, 'key': client_key_pem}
-                        
+
             host = "169.254.184.34"
             local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
             if local_or_remote == "remote":
                 host = "127.0.0.1"
-                        
+
             #print("Connect on %s" % host)
             cnx = MySQLdb.connect(
                 host=host,
                 port=3306,
                 user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
-            
+
             #logging.info("Success = %s" % str(res[0]))
             response = "Success!"
     except Exception as err:
         response = "Failed."
         log_msg("Connection error: %s" % err)
-        
+
     return cnx, response
 
 weekday = datetime.datetime.today().weekday()
@@ -91,7 +91,7 @@ def log_msg(s, no_print=False):
     log = open(log_file, 'a')
     log.write("%s  %s\n" % (datetime.datetime.today().strftime("%H:%M:%S"),s))
     log.close()
-    
+
 # Create a connection to the database
 mysql_conn, r = mysql_connect();  mysql_attempts = 0
 while mysql_conn is None and mysql_attempts < 10:
@@ -113,7 +113,7 @@ row = cursor.fetchone()
 if local_or_remote != row[0]:
     print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
     sys.exit()
-    
+
 query = "SELECT yelp_url, yelp_ID from Yelp_Listings where country_code ='US' and active=1 and manually_scanned=0"
 cursor.execute(query)
 res1 = cursor.fetchall()
@@ -128,7 +128,7 @@ for r in res2:
 res1 = None
 res2 = None
 
-cursor.close(); mysql_conn.close()  
+cursor.close(); mysql_conn.close()
 #f = open('/home/pi/zack/tweets.csv', 'w')
 
 date_regex = re.compile(r'[A-Za-z]{3}\s([A-Za-z]{3})\s([0-9]{2})\s([0-9]{2})\:([0-9]{2})\:([0-9]{2})\s\+[0-9]{4}\s([0-9]{4})')
@@ -167,45 +167,45 @@ for k, url in enumerate(res):
         requests_made += 1
         status, response = http.request(url[0])
         log_msg("Returned a response of length %d" % len(response), no_print=True)
-        
-    except httplib.InvalidURL: 
+
+    except httplib.InvalidURL:
         log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib2.SSLHandshakeError: 
+    except httplib2.SSLHandshakeError:
         log_msg("SSL Issue with link:\n\t%s\n" % url[0])
         status = None
-    except httplib.ResponseNotReady: 
+    except httplib.ResponseNotReady:
         log_msg("Found an ResponseNotReady Error, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib2.ServerNotFoundError: 
+    except httplib2.ServerNotFoundError:
         log_msg("ServerNotFound Error with link:\n\t%s\n" % url[0])
         status = None
-    except OverflowError: 
+    except OverflowError:
         log_msg("OverflowError, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib.IncompleteRead: 
+    except httplib.IncompleteRead:
         log_msg("Incomplete read, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except ssl.SSLEOFError: 
+    except ssl.SSLEOFError:
         log_msg("SSL Issue with link:\n\t%s\n" % url[0])
         status = None
-    except socket_error: 
+    except socket_error:
         log_msg("Socket Error with link:\n\t%s\n" % url[0])
         status = None
-    except UnicodeError: 
+    except UnicodeError:
         log_msg("UnicodeError with link:\n\t%s\n" % url[0])
         status = None
     except httplib2.RedirectLimit:
         log_msg("RedirectLimit with link:\n\t%s\n" % url[0])
         status = None
-        
+
     if status is not None:
         log_msg("Status: %s" % status, no_print = True)
         #f.write("Status: %s\n" % status)
         if 'content-type' in status:
-            
+
             if "text/html" in status['content-type'].lower():
-            
+
                 new_links_found = 0
                 found = False
                 mysql_conn, r = mysql_connect();  mysql_attempts = 0
@@ -217,7 +217,7 @@ for k, url in enumerate(res):
                     sys.exit()
                 cursor = mysql_conn.cursor()
                 for i, link in enumerate(BeautifulSoup(response, parseOnlyThese=SoupStrainer('a'))):
-                    
+
                     if link.has_key("href"):
                         log_msg("%d\t%s" % (i, link['href']),no_print=True)
                         #print("\t%s" % link)
@@ -241,7 +241,7 @@ for k, url in enumerate(res):
                     if 'content-length' in status:
                         cnt_link_not_found += 1
                         consec_no_link += 1
-                    
+
                         f_ = open('/home/pi/zack/yelp_ext_url_scans_response_lengths', 'a')
                         f_.write("%s,no link\n" % (status['content-length'])); f_.close()
                         if consec_no_link == 50:
@@ -253,18 +253,18 @@ for k, url in enumerate(res):
                     f_ = open('/home/pi/zack/yelp_ext_url_scans_response_lengths', 'a')
                     f_.write("%s,link\n" % (status['content-length'])); f_.close()
                 if True:
-                    mysql_conn.commit(); 
+                    mysql_conn.commit();
                 else:
                     print("Reminder: nothing is being committed right now.")
-                cursor.close(); mysql_conn.close()     
+                cursor.close(); mysql_conn.close()
                 log_msg("\t\t%s link(s) processed  --  %s with links  -- %s without links...\n----------------------------------------------" % ("{:,}".format(cnt_link_found + cnt_link_not_found), "{:,}".format(cnt_link_found), "{:,}".format(cnt_link_not_found)))
     coming_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6) + datetime.timedelta(minutes=2)).hour) / 8)
     if hr_period != coming_period:
         log_msg("End of session at %s" % (datetime.datetime.today().strftime("%H:%M:%S")))
-        
-        #bot, chat_id = setup_telegram()
+
+        #bot, chat_id = setup_telepot()
         #msg = "End of yelp_ext_url_scan session at %s" % (datetime.datetime.today().strftime("%H:%M:%S"))
         #bot.sendMessage(chat_id=chat_id, text=msg)
         log_msg("Done!!!")
-        sys.exit()   
+        sys.exit()
 log_msg("Done!!!")

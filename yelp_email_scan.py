@@ -2,7 +2,7 @@ import time, os, datetime, sys, psutil, random
 import re
 import MySQLdb
 import subprocess
-import telegram
+import telepot
 import requests
 import httplib2, httplib, zlib
 from BeautifulSoup import BeautifulSoup, SoupStrainer
@@ -15,24 +15,24 @@ import ssl
 from subprocess import Popen, PIPE
 
 from random import shuffle
-sys.path.insert(0, "../ZackInc")
+sys.path.insert(0, "/home/pi/zack/ZackInc")
 import zack_inc as zc
 
 
 bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 
-def setup_telegram():
+def setup_telepot():
     # Connect to our bot
-    bot = telegram.Bot(token=bot_token)
+    bot = telepot.Bot(token=bot_token)
 
     # Waits for the first incoming message
     updates=[]
     while not updates:
         updates = bot.getUpdates()
-        
+
     # Gets the id for the active chat
     #print updates[-1].message.text
-    chat_id=updates[-1].message.chat_id
+    chat_id=updates[-1]['message']['chat']['id']
 
 
     return bot, chat_id
@@ -55,24 +55,24 @@ def mysql_connect():
             client_cert_pem = "instance/client_cert_pem"
             client_key_pem = "instance/client_key_pem"
             ssl = {'cert': client_cert_pem, 'key': client_key_pem}
-                        
+
             host = "169.254.184.34"
             local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
             if local_or_remote == "remote":
                 host = "127.0.0.1"
-                        
+
             #print("Connect on %s" % host)
             cnx = MySQLdb.connect(
                 host=host,
                 port=3306,
                 user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
-            
+
             #logging.info("Success = %s" % str(res[0]))
             response = "Success!"
     except Exception as err:
         response = "Failed."
         log_msg("Connection error: %s" % err)
-        
+
     return cnx, response
 
 log_file = '/home/pi/zack/Logs/yelp_email_log_%s.txt' % (datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"))
@@ -84,7 +84,7 @@ def log_msg(s, no_print=False):
     log = open(log_file, 'a')
     log.write("%s  %s\n" % (datetime.datetime.today().strftime("%H:%M:%S"),s))
     log.close()
-    
+
 # Create a connection to the database
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 
@@ -99,7 +99,7 @@ row = cursor.fetchone()
 if local_or_remote != row[0]:
     print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
     sys.exit()
-    
+
 query  = "SELECT a.url, b.ID, c.ID, a.yelp_listing_ID, a.time_stored, a.capture_sequence from Data_Capture_Links a, Data_Capture_Campaigns b, Email_Scrapes c where "
 query += "c.active=1 and c.complete = 0 and a.scanned_for_emails=0 and ISNULL(crawl_errors) and IFNULL(a.content_type, '')='' and "
 query += "c.data_capture_campaign_ID=a.data_capture_campaign_ID and  b.ID=a.data_capture_campaign_ID"
@@ -147,7 +147,7 @@ for k, url in enumerate(res2):
         domain = "%s%s" % (m.group(1), m.group(3))
     else:
         domain = ''
-    
+
     log_msg("%s out of %s" % ("{:,}".format(k+1), "{:,}".format(len(res))))
     if last_domain != domain:
         #log_msg("It's a different domain from before, so searching %s (%d out of %d)\n\t%s vs %s" % (url[0], k+1, len(res), domain, last_domain))
@@ -159,53 +159,53 @@ for k, url in enumerate(res2):
             time.sleep(1)
     else:
         log_msg("\tBecause it's the first, we are going to go ahead with  searching %s (%d out of %d)" % (url[0], k+1, len(res)))
-    
+
     start_ms = current_milli_time()
     http = httplib2.Http(timeout=20, disable_ssl_certificate_validation=True)
     try:
         requests_made += 1
         status, response = http.request(url[0])
         log_msg("Returned a response of length %d" % len(response), no_print=True)
-    except httplib.BadStatusLine: 
+    except httplib.BadStatusLine:
         log_msg("Found a bad status line, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except OverflowError: 
+    except OverflowError:
         log_msg("OverflowError, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib.IncompleteRead: 
+    except httplib.IncompleteRead:
         log_msg("Incomplete read, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib.ResponseNotReady: 
+    except httplib.ResponseNotReady:
         log_msg("Found an ResponseNotReady Error, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib.InvalidURL: 
+    except httplib.InvalidURL:
         log_msg("Found an invalid url, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except zlib.error: 
+    except zlib.error:
         log_msg("zlib decompression error, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib2.FailedToDecompressContent: 
+    except httplib2.FailedToDecompressContent:
         log_msg("httplib2.FailedToDecompressContent error, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib2.RelativeURIError: 
+    except httplib2.RelativeURIError:
         log_msg("RelativeURIError, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib2.RedirectMissingLocation: 
+    except httplib2.RedirectMissingLocation:
         log_msg("RedirectMissingLocation, not sure why this was grabbed as a link\n\t%s\n" % url[0])
         status = None
-    except httplib2.SSLHandshakeError: 
+    except httplib2.SSLHandshakeError:
         log_msg("SSL Issue with link:\n\t%s\n" % url[0])
         status = None
-    except httplib2.ServerNotFoundError: 
+    except httplib2.ServerNotFoundError:
         log_msg("ServerNotFound Error with link:\n\t%s\n" % url[0])
         status = None
-    except ssl.SSLEOFError: 
+    except ssl.SSLEOFError:
         log_msg("SSL Issue with link:\n\t%s\n" % url[0])
         status = None
-    except socket_error: 
+    except socket_error:
         log_msg("Socket Error with link:\n\t%s\n" % url[0])
         status = None
-    except UnicodeError: 
+    except UnicodeError:
         log_msg("UnicodeError with link:\n\t%s\n" % url[0])
         status = None
     except httplib2.RedirectLimit:
@@ -227,11 +227,11 @@ for k, url in enumerate(res2):
     print("\tConnecting to MySQL DB took %d ms" % (end_ms - start_ms))
     if status is not None:
         log_msg("Status: %s" % status, no_print = True)
-        
+
         if 'content-type' in status:
-            
+
             if "text/html" in status['content-type'].lower():
-            
+
                 matches = re.findall(email_regex, response)
                 if len(matches) > 0:
                     log_msg("\tWe found %d matches" % len(matches), no_print = True)
@@ -246,14 +246,14 @@ for k, url in enumerate(res2):
                                 param = [m, url[2], datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"), url[0], url[3]]
                                 log_msg("Query %s w\ %s" % (insert_query, param), no_print = True)
                                 cursor.execute(insert_query, param)
-                            
-                        
+
+
         if len(response) > 0:
             param = [url[4], url[5]]
             log_msg("Query %s w\ %s" % (update_query_found, param), no_print = True)
             cursor.execute(update_query_found, param)
-             
-                
+
+
     else:
         param = [url[4], url[5]]
         log_msg("Query %s w\ %s" % (update_query_error, param), no_print = True)
@@ -262,13 +262,13 @@ for k, url in enumerate(res2):
         mysql_conn.commit()
     else:
         print("\n\nReminder, nothing is being committed!!!!\n")
-    cursor.close(); mysql_conn.close()     
+    cursor.close(); mysql_conn.close()
     last_domain = domain
     coming_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6) + datetime.timedelta(minutes=10)).hour) / 8)
     if hr_period != coming_period:
         log_msg("End of session at %s" % (datetime.datetime.today().strftime("%H:%M:%S")))
-        
-        #bot, chat_id = setup_telegram()
+
+        #bot, chat_id = setup_telepot()
         #msg = "End of yelp_email_scan session at %s" % (datetime.datetime.today().strftime("%H:%M:%S"))
         #bot.sendMessage(chat_id=chat_id, text=msg)
         log_msg("Done!!!")

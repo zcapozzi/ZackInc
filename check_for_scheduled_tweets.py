@@ -5,7 +5,7 @@ import time, os, datetime, sys, psutil, random
 import re
 import MySQLdb
 import subprocess
-import telegram
+
 import glob
 from bs4 import BeautifulSoup
 #import requests
@@ -32,31 +32,31 @@ bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 def mysql_connect():
     cnx = None
     try:
-        
+
         # Connecting from an external network.
         # Make sure your network is whitelisted
         #logging.info("Connecting via remote %s..." % app.config['DBNAME'])
         client_cert_pem = "instance/client_cert_pem"
         client_key_pem = "instance/client_key_pem"
         ssl = {'cert': client_cert_pem, 'key': client_key_pem}
-         
+
         host = "169.254.184.34"
         local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
         if local_or_remote == "remote":
             host = "127.0.0.1"
-                    
+
         print("Connect on %s" % host)
         cnx = MySQLdb.connect(
             host=host,
             port=3306,
             user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
-        
+
         #logging.info("Success = %s" % str(res[0]))
         response = "Success!"
     except Exception as err:
         response = "Failed."
         print("Connection error: %s" % err)
-        
+
     return cnx, response
 
 
@@ -121,7 +121,7 @@ for r in res:
         within_one_hour.append(r[3])
     elif agg > -7200 and agg < 0:
         within_two_hour.append(r[3])
-        
+
 cursor.close(); mysql_conn.close()
 if len(to_send) == 0:
     if len(within_one_hour) > 0:
@@ -134,23 +134,24 @@ if len(to_send) == 0:
             flog.write("\t%s\n" % t)
     else:
         flog.write("\n\nNo Scheduled Tweets to send within the next two hours...\n")
-    
+
 else:
     flog.write("\n\nSend %d scheduled tweet(s)\n------------------------------\n" % (len(to_send)))
 for tweet_rec in to_send:
-    
 
-    #1 Confirm that the arguments were all accounted for 
+
+    #1 Confirm that the arguments were all accounted for
     #python send_tweet.py [as who] [text] [optional photo path]
     flog.write("#1\n")
     send_as = tweet_rec['send_as']
     tweet = tweet_rec['tweet']
+    tweet = tweet.replace("<br>", "\n").replace("<BR>", "\n")
     image_path = tweet_rec['image_path']
     image_yes_no = 1
     if image_path is None or image_path == "n/a":
         image_path = None
         image_yes_no = 0
-    
+
 
     #2 Use [send_as] to authenticate above
     flog.write("#2\n")
@@ -158,8 +159,8 @@ for tweet_rec in to_send:
     if api is None:
         print("Authentication failed\n--------------------------\n\tsend_tweet.py [send as] [tweet text] [optional image path]")
         sys.exit()
-        
-        
+
+
     #3 Attach image (if necessary)
     flog.write("#3\n")
     image_ids = None
@@ -179,7 +180,7 @@ for tweet_rec in to_send:
                 flog.write("Send tweet w/ image: %s\n" % (tweet))
                 api.update_status(status=tweet, media_ids=image_ids['media_id'])
         else:
-            
+
             if tweet_rec['in_reply_to_ID'] is not None:
                 flog.write("Send tweet w/ reply to ID: %s\n" % (tweet))
                 api.update_status(status=tweet, in_reply_to_status_id=tweet_rec['in_reply_to_ID'])

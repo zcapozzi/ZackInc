@@ -15,9 +15,9 @@ import MySQLdb
 import datetime
 from datetime import datetime
 
-import telegram; bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
+import telepot; bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 
-sys.path.insert(0, "../ZackInc")
+sys.path.insert(0, "/home/pi/zack/ZackInc")
 import zack_inc as zc
 
 
@@ -87,12 +87,12 @@ def mysql_connect():
         client_cert_pem = "instance/client_cert_pem"
         client_key_pem = "instance/client_key_pem"
         ssl = {'cert': client_cert_pem, 'key': client_key_pem}
-                    
+
         host = "169.254.184.34"
         local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
         if local_or_remote == "remote":
             host = "127.0.0.1"
-                    
+
         #print("Connect on %s" % host)
         cnx = MySQLdb.connect(
             host=host,
@@ -102,7 +102,7 @@ def mysql_connect():
     except Exception as err:
         response = "Failed: %s" % err
         print(response)
-        
+
     return cnx, response
 
 
@@ -166,16 +166,16 @@ def get_results(service, profile_id, name, account_ID):
     #print("\n\nUse profile id: %s" % profile_id)
     record = {'Service': 'zack'}
     single_keys = ['sessions', 'bounces', 'avgSessionDuration', 'users', 'newUsers']
-    multiple_keys = [['date', '7dayUsers'], ['date', '14dayUsers'], ['date', '30dayUsers'], 
+    multiple_keys = [['date', '7dayUsers'], ['date', '14dayUsers'], ['date', '30dayUsers'],
     ['sourceMedium', 'timeOnPage'], ['sourceMedium', 'newUsers'], ['sourceMedium', 'Users'], ['sourceMedium', 'pageviews'], ['sourceMedium', 'organicSearches'],
     ['adContent', 'timeOnPage'], ['adContent', 'sessions'], ['adContent', 'newUsers'], ['adContent', 'Users'], ['adContent', 'pageviews'], ['adContent', 'organicSearches'],
     ['adContent, ga:pagePath', 'timeOnPage'], ['adContent, ga:pagePath', 'sessions'], ['adContent, ga:pagePath', 'newUsers'], ['adContent, ga:pagePath', 'Users'], ['adContent, ga:pagePath', 'pageviews'], ['adContent, ga:pagePath', 'organicSearches'],
     ['searchKeyword', 'timeOnPage'], ['searchKeyword', 'newUsers'], ['searchKeyword', 'Users'], ['searchKeyword', 'pageviews'], ['searchKeyword', 'organicSearches'],
     ['searchStartPage', 'timeOnPage'], ['searchStartPage', 'newUsers'], ['searchStartPage', 'Users'], ['searchStartPage', 'pageviews'], ['searchStartPage', 'organicSearches'],
     ['hostname, ga:pagePath', 'timeOnPage'], ['hostname, ga:pagePath', 'newUsers'], ['hostname, ga:pagePath', 'Users'], ['hostname, ga:pagePath', 'pageviews'], ['hostname, ga:pagePath', 'organicSearches']]
-   
-    
-    
+
+
+
     print("\n\nProcessing %s..." % name)
     mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
     query = "SELECT ID from GA_Properties where website=%s and GA_Code=%s"
@@ -183,19 +183,19 @@ def get_results(service, profile_id, name, account_ID):
     print("Query %s w/ %s" % (query, param))
     cursor.execute(query, param)
     ID = cursor.fetchone()[0]
-    
-    
+
+
     insert_metric_query = "INSERT INTO GA_Metrics (timestamp, property_ID, description, data, most_recent) VALUES (%s, %s, %s, %s, 1)"
     insert_dimension_metric_query = "INSERT INTO GA_Dimension_Metrics (timestamp, property_ID, description, dimension_description, data, most_recent, metric) VALUES (%s, %s, %s, %s, %s, 1, %s)"
-   
+
     insert_metric_query_no_data = "INSERT INTO GA_Metrics (timestamp, property_ID, description, most_recent) VALUES (%s, %s, %s, 1)"
     insert_dimension_metric_query_no_data = "INSERT INTO GA_Dimension_Metrics (timestamp, property_ID, description, dimension_description, most_recent, metric) VALUES (%s, %s, %s, %s, 1, %s)"
-   
+
     for key in single_keys:
-        #print("\tGrab key: %s" % key)  
-        
+        #print("\tGrab key: %s" % key)
+
         results = service.data().ga().get(ids='ga:' + profile_id, start_date="7daysAgo", end_date='today', metrics='ga:%s' % key).execute()
-        
+
         if results.get('rows'):
             print("\t%s: %s" % (key, results.get('rows')[0][0]))
             record[key] = results.get('rows')[0][0]
@@ -207,9 +207,9 @@ def get_results(service, profile_id, name, account_ID):
             param = [datetime.today(), ID, key]
             print("Query %s w/ %s" % (insert_metric_query_no_data, param))
             cursor.execute(insert_metric_query_no_data, param)
-    
+
     for dim, metric in multiple_keys:
-            
+
         if "dayUsers" in metric:
             results = service.data().ga().get(ids='ga:' + profile_id, start_date='today', end_date='today', dimensions='ga:%s' % dim, metrics='ga:%s' % metric).execute()
             if results.get('rows'):
@@ -228,12 +228,12 @@ def get_results(service, profile_id, name, account_ID):
                 param = [datetime.today(), ID, metric]
                 print("Query %s w/ %s" % (insert_metric_query_no_data, param))
                 cursor.execute(insert_metric_query_no_data, param)
-            
+
         else:
             results = service.data().ga().get(ids='ga:' + profile_id, start_date='7daysAgo', end_date='today', dimensions='ga:%s' % dim, metrics='ga:%s' % metric).execute()
             print("\t%s\t%s" % (dim, metric))
             #print("For metric %s: %s" % (metric, data.get('rows')))
-            
+
             if results.get('rows'):
                 for d in results.get('rows'):
                     #print(d)
@@ -251,11 +251,11 @@ def get_results(service, profile_id, name, account_ID):
                 param = [datetime.today(), ID, metric, dim, None]
                 print("Query %s w/ %s" % (insert_dimension_metric_query_no_data, param))
                 cursor.execute(insert_dimension_metric_query_no_data, param)
-    
+
     if commit_stuff:
         mysql_conn.commit()
     else:
-        print("\n\nReminder, nothing is being committed...") 
+        print("\n\nReminder, nothing is being committed...")
     cursor.close(); mysql_conn.close()
 """
 def print_results(results):
@@ -264,9 +264,9 @@ def print_results(results):
     total_sessions = results.get('rows')[0][0]
     print 'View (Profile): %s' % results.get('profileInfo').get('profileName')
     print 'Total Sessions: %s' % total_sessions
-    
-    
-    
+
+
+
     print(results.__class__)
     print(results)
 
@@ -296,17 +296,17 @@ def main():
         print("Do not run %s because this host isn't the one that's supposed to be running it ( %s vs %s )" % (scriptname, local_or_remote, row[0]))
         sys.exit()
     #if False: # if True, this will clear the tables prior to running
-      
+
     #    cursor.execute("TRUNCATE TABLE GA_Metrics")
     #    cursor.execute("TRUNCATE TABLE GA_Dimension_Metrics")
-      
+
 
     reset_query = "UPDATE GA_Metrics set most_recent=0"
     reset_query_2 = "UPDATE GA_Dimension_Metrics set most_recent=0"
     cursor.execute(reset_query)
     cursor.execute(reset_query_2)
     if commit_stuff:
-        mysql_conn.commit(); 
+        mysql_conn.commit();
     cursor.close(); mysql_conn.close();
 
     # Authenticate and construct service.
@@ -315,42 +315,42 @@ def main():
     #profile = get_first_profile_id(service)
     #print("Would have used %s" % profile)
     profiles, names, account_ids = get_all_profiles(service)
-    
+
     property_ID = None
     if len(sys.argv) > 2:
         for i in range(1, len(sys.argv)):
             if sys.argv[i] == '-p':
                 property_ID = sys.argv[i+1]
-    
-  
-  
-  
+
+
+
+
     for p, n, a in zip(profiles, names, account_ids):
         if property_ID is None:
-        
+
             get_results(service, p, n, a)
         else:
             if property_ID in n:
                 get_results(service, p, n, a)
-commit_stuff = True    
+commit_stuff = True
 if __name__ == '__main__':
     main()
     print("\t\n\n\tAll Done!!!")
-    bot = telegram.Bot(token=bot_token)
+    bot = telepot.Bot(token=bot_token)
 
     # Waits for the first incoming message
     updates=[]
     while not updates:
         updates = bot.getUpdates()
-        
+
     # Gets the id for the active chat
 
-    chat_id=updates[-1].message.chat_id
+    chat_id=updates[-1]['message']['chat']['id']
 
     # Sends a message to the chat
     msg = "Done with Hello Analytics.py"
     bot.sendMessage(chat_id=chat_id, text=msg)
-    print("Telegram %s" % msg)
+    print("telegram %s" % msg)
 """
  def get_results(service, profile_id):
   # Use the Analytics Service Object to query the Core Reporting API
@@ -360,4 +360,4 @@ if __name__ == '__main__':
       start_date='7daysAgo',
       end_date='today',
       metrics='ga:sessions').execute()
- """ 
+ """

@@ -2,7 +2,7 @@ import time, os, datetime, sys, psutil, random
 import re
 import MySQLdb
 import subprocess
-import telegram
+
 from bs4 import BeautifulSoup
 #import requests
 #import httplib2
@@ -12,7 +12,7 @@ sys.setdefaultencoding("utf-8")
 
 from twython import Twython
 from twython import TwythonAuthError, TwythonError
-import telegram; bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
+import telepot; bot_token = "308120049:AAFBSyovjvhlYAe1xeTO2HAvYO4GBY3xudc"
 
 import errno
 from socket import error as socket_error
@@ -42,24 +42,24 @@ def mysql_connect():
             client_cert_pem = "instance/client_cert_pem"
             client_key_pem = "instance/client_key_pem"
             ssl = {'cert': client_cert_pem, 'key': client_key_pem}
-                        
+
             host = "169.254.184.34"
             local_or_remote = open('/home/pi/zack/local_or_remote', 'r').read()
             if local_or_remote == "remote":
                 host = "127.0.0.1"
-                        
+
             #print("Connect on %s" % host)
             cnx = MySQLdb.connect(
                 host=host,
                 port=3306,
                 user='root', passwd='password', db='monoprice', charset="utf8", use_unicode=True)
-                
+
             #logging.info("Success = %s" % str(res[0]))
             response = "Success!"
     except Exception as err:
         response = "Failed."
         print("Connection error: %s" % err)
-        
+
     return cnx, response
 
 
@@ -100,7 +100,7 @@ def authenticate_me(whoami):
 ##########################
 commit_results = True  #
 ##########################
- 
+
 # Create a connection to the database
 mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 
@@ -117,7 +117,7 @@ if local_or_remote != row[0]:
 query = "SELECT ID, twitter_handle from Twitter_Accounts where active=1 order by ID desc"
 cursor.execute(query)
 res = cursor.fetchall()
-cursor.close(); mysql_conn.close()  
+cursor.close(); mysql_conn.close()
 
 date_regex = re.compile(r'[A-Za-z]{3}\s([A-Za-z]{3})\s([0-9]{2})\s([0-9]{2})\:([0-9]{2})\:([0-9]{2})\s\+[0-9]{4}\s([0-9]{4})')
 header = ""
@@ -140,8 +140,8 @@ hr_period = int(int((datetime.datetime.today() - datetime.timedelta(hours=6)).ho
 # 3 8-hr periods
 updated_accounts = 0
 for handle in res:
-    
-    
+
+
     log_msg("Refreshing profile snapshot for %s" % handle[1])
     api = authenticate_me("zack")
     try:
@@ -207,18 +207,18 @@ for handle in res:
     if mysql_conn is None:
         log_msg("Could not connect to MySQL after 10 tries...exiting.")
         sys.exit()
-    
+
     if handle is not None:
         log_msg("%s has %d followers..." % (handle[1], tu['followers_count']))
-    
-    
 
-    
+
+
+
         cursor = mysql_conn.cursor()
         query = "UPDATE Twitter_Account_Snapshot set most_recent=0 where twitter_account_ID=%s"
         param = [handle[0]]
         cursor.execute(query, param)
-        
+
         query = "INSERT INTO Twitter_Account_Snapshot (datestamp, twitter_account_ID, twitter_handle, num_followers, verified, twitter_name, num_tweets, num_following, url, most_recent)"
         query += " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 1)"
         param = [datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"), handle[0], handle[1], tu['followers_count'], 1 if tu['verified'] else 0, tu['name'], tu['statuses_count'], tu['friends_count'], tu['url']]
@@ -230,13 +230,13 @@ for handle in res:
         log_msg("Query %s w/ %s" % (query, param))
         tu = None
         updated_accounts += 1
-    
+
     if commit_results:
         mysql_conn.commit()
     else:
         print("\n\n\tREMINDER, nothing is being committed!!!!\n\n")
-    cursor.close(); mysql_conn.close()     
-    
+    cursor.close(); mysql_conn.close()
+
     per_call_delay = int(re.compile(r'per_call_delay\: ([0-9]+)').search(open('/home/pi/zack/update_twitter_profile_parameters', 'r').read()).group(1))
     log_msg("Wait for %d seconds..." % per_call_delay)
     time.sleep(per_call_delay)
@@ -253,7 +253,7 @@ last_cursor = -1
 my_followers = []
 followers_added_to_capture = 0
 while next_cursor:
-    
+
     followers = api.get_followers_list(screen_name = "laxreference", count=200)
     for follower in followers['users']:
         follower_count += 1
@@ -266,7 +266,7 @@ while next_cursor:
         break
     last_cursor = next_cursor
     time.sleep(60)
-    
+
 
 
 check_followed_query1 = "SELECT count(1) from Twitter_Accounts where twitter_handle = %s"
@@ -275,7 +275,7 @@ check_followed_query2 = "SELECT count(1) from Twitter_Accounts where twitter_han
 mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
 for m in my_followers:
     check_followed_param = [m['handle']]
-    
+
     cursor.execute(check_followed_query1, check_followed_param)
     count = cursor.fetchone()[0]
     query = None
@@ -292,7 +292,7 @@ for m in my_followers:
     if query is not None:
         print("Query %s w/ %s" % (query, param))
         cursor.execute(query, param)
-    
+
     query = "INSERT INTO Twitter_Follower_Snapshot (datestamp, twitter_ID) VALUES(%s, %s)"
     param = [datetime.datetime.today(), m['handle']]
     print("Query %s /w %s" % (query, param))
@@ -306,16 +306,16 @@ else:
 cursor.close(); mysql_conn.close()
 log_msg("DONE!!!")
 
-bot = telegram.Bot(token=bot_token)
+bot = telepot.Bot(token=bot_token)
 
 # Waits for the first incoming message
 updates=[]
 while not updates:
     updates = bot.getUpdates()
-    
+
 # Gets the id for the active chat
 
-chat_id=updates[-1].message.chat_id
+chat_id=updates[-1]['message']['chat']['id']
 
 # Sends a message to the chat
 msg = "Done with update_twitter_accounts\n  %s accounts updated\n  %s followers added to tweet capture" % ("{:,}".format(updated_accounts), "{:,}".format(followers_added_to_capture))

@@ -32,7 +32,7 @@ def translate_event_type(p, pd, full_detail):
             e = "Blocked Shot"
         elif p == "shot" and ("hit post " in pd or pd.endswith(" hit post.") or pd.endswith(" hit post")):
             e = "Pipe Shot"
-        elif p == "shot" and (pd.endswith(" hit crossbar") or pd.endswith(" hit crossbar.")):
+        elif p == "shot" and (pd.endswith(" hit crossbar") or pd.endswith(" hit crossbar.") or " hit crossbar {" in pd):
             e = "Pipe Shot"
         elif p == "goal" and " assist by " in pd:
             e = "Assisted Goal"
@@ -62,6 +62,8 @@ def translate_event_type(p, pd, full_detail):
             e = "Penalty - 30 sec"
         elif p == "penalty" and "slsh/0:00" in pd:
             e = "Penalty - 1 min"
+        elif p == "penalty" and "slashing/0:00" in pd:
+            e = "Penalty - 1 min"
         elif p == "penalty" and "1:30" in pd:
             e = "Penalty - 90 sec"
         elif p == "penalty" and "0:30" in pd:
@@ -88,6 +90,8 @@ def translate_event_type(p, pd, full_detail):
             e = "Substitution"
         elif "free position attempt" == p:
             e = None
+        elif p == "shot":
+            e = "Missed Shot"
         if e == "???" or False:
             print("Unable to assign the following play to any play type...\n\n")
             print("\t%s | %s\n" % (p, pd))
@@ -435,6 +439,7 @@ def get_adj_odds(section, adjusted_diff, win_odds_data, win_odds_ID):
     loc = 22 + adjusted_diff
     loc = max(0, min(loc, 41))
 
+
     if section in win_odds_ID:
         last = -1
         for i, o_ in enumerate(win_odds_data[win_odds_ID.index(section)].split(",")[:-1]):
@@ -461,6 +466,7 @@ def get_adj_odds(section, adjusted_diff, win_odds_data, win_odds_ID):
 
         return -1
     else:
+
         return  -1
 
 current_milli_time = lambda: int(round(time.time() * 1000))
@@ -477,6 +483,14 @@ def get_tracking_name(tracking_code, cursor):
         return tracking_code
     else:
         return r[0]
+
+def get_team_colors(cursor):
+    cursor.execute("Select name, IFNULL(fg_color, '(255,255,255,255)'), IFNULL(bg_color, '(0,0,0,255)') from LaxRef_Teams where active=1")
+    results = []
+    res = cursor.fetchall()
+    for r in res:
+        results.append({'Team': r[0],'fg_color': r[1],'bg_color': r[2]})
+    return results
 
 def get_url_title(url, cursor):
 

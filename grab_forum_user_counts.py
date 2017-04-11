@@ -73,14 +73,14 @@ mysql_conn, response = mysql_connect(); cursor = mysql_conn.cursor()
 
 
 
-query = "SELECT email_campaign_descriptor, twitter_handle from GA_Tracking_Tags where campaign_source like '%Forum%'"
+query = "SELECT email_campaign_descriptor, twitter_handle from GA_Tracking_Tags where campaign_source like '%Reddit%'"
 cursor.execute(query)
 res = cursor.fetchall()
 
 regex = []
 regex.append(re.compile(r'([0-9,]+) post', re.IGNORECASE))
 regex.append(re.compile(r'Read ([0-9,]+) time', re.IGNORECASE))
-regex.append(re.compile(r'viewing this subreddit in the past 15 minutes\"><span class=\"number\">\~([0-9]+)</span>', re.IGNORECASE))
+regex.append(re.compile(r'viewing this subreddit in the past 15 minutes\"><span class=\"number\">\~?([0-9]+)</span>', re.IGNORECASE))
 for r in res:
     url = r[1]
     forum = r[0]

@@ -22,8 +22,8 @@ import MySQLdb
 from StringIO import StringIO
 from cycler import cycler
 
-#import matplotlib
-#matplotlib.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
 
@@ -72,6 +72,7 @@ if len(sys.argv) > 1:
 
 
 metrics = ['pageviews', 'newUsers', 'Users', 'timeOnPage', 'organicSearches']
+
 weeks_back = 3
 for metric in metrics:
     mysql_conn, response = mysql_connect()
@@ -85,6 +86,9 @@ for metric in metrics:
     dates = []
     y_posts = []
     y_pages = []
+    if metric == "pageviews":
+        y_posts_time_per_view = []
+        y_pages_time_per_view = []
     x = []
     #x_dates = []
     num_dates = 0
@@ -108,6 +112,7 @@ for metric in metrics:
             #x_dates.append(r[2])
             num_dates += 1
     for u in urls:
+
         #y_posts.append([0] * num_dates)
         #y_pages.append([0] * num_dates)
 
@@ -118,6 +123,9 @@ for metric in metrics:
             d2.append({'date': i, 'cnt': 0})
         y_posts.append(d1)
         y_pages.append(d2)
+        if metric == "pageviews":
+            y_posts_time_per_view.append(d1)
+            y_pages_time_per_view.append(d2)
 
 
     #print("X: %s" % str(x))
@@ -146,10 +154,32 @@ for metric in metrics:
                             y_posts[urls.index(u)][[x['date'] for x in y_posts[urls.index(u)]].index(dt)]['cnt'] += r[1]
                         else:
                             y_pages[urls.index(u)][[x['date'] for x in y_pages[urls.index(u)]].index(dt)]['cnt'] += r[1]
+                        if metric == "pageviews":
+                            if u.startswith("/201"):
+                                y_posts_time_per_view[urls.index(u)][[x['date'] for x in y_posts_time_per_view[urls.index(u)]].index(dt)]['cnt'] += r[1]
+                            else:
+                                y_pages_time_per_view[urls.index(u)][[x['date'] for x in y_pages_time_per_view[urls.index(u)]].index(dt)]['cnt'] += r[1]
         #break
 
-
     ys = [{'vals': y_posts, 'title': "Posts"}, {'vals': y_pages, 'title': "Pages"}]
+    if metric == "timeOnPage":
+
+        for i, (views, times) in enumerate(zip(y_posts_time_per_view, y_posts)):
+            for v, t in zip(views, times):
+                #if "stats/pace/" in urls[i]:
+                #    print("%s - %s vs %s becomes %.2f" % (urls[i], v, t, 0 if v['cnt'] == 0 else float(t['cnt'])/float(v['cnt'])))
+                v['cnt'] = 0 if v['cnt'] == 0 else float(t['cnt'])/float(v['cnt'])
+
+        for i, (views, times) in enumerate(zip(y_pages_time_per_view, y_pages)):
+            for v, t in zip(views, times):
+                if urls[i].endswith("stats/"):
+                    print("%s - %s vs %s becomes %.2f" % (urls[i], v, t, 0 if v['cnt'] == 0 else float(t['cnt'])/float(v['cnt'])))
+                v['cnt'] = 0 if v['cnt'] == 0 else float(t['cnt'])/float(v['cnt'])
+
+        ys.append({'vals': y_posts_time_per_view, 'title': "per view Posts"})
+        ys.append({'vals': y_pages_time_per_view, 'title': "per view Pages"})
+
+
     for ys_ in ys:
 
         fig = plt.figure()
@@ -175,6 +205,7 @@ for metric in metrics:
         if len(sum_counts) > 8:
             print("Cutoff: %d" %sum_counts[6])
 
+        added = 0
         for y_, u in zip(ys_['vals'], urls):
             #print y_
             y_ = sorted(y_, key=lambda x: x['date'])
@@ -182,8 +213,8 @@ for metric in metrics:
             #sys.exit()
             sum_count = sum([e['cnt'] for e in y_])
 
-            if len(sum_counts) < 8 or sum_count >= sum_counts[6]:
-
+            if added < 7 and (len(sum_counts) < 8 or sum_count >= sum_counts[6]):
+                added += 1
                 #print("For %s \n\tPlot %s vs \n\t%s" % (zc.get_url_title(u, cursor), str([e['date'] for e in y_]), str([e['cnt'] for e in y_])))
                 ax1.plot([e['date'] for e in y_], [e['cnt'] for e in y_], label=zc.get_url_title(u, cursor), linewidth=2.0)
                 series += 1

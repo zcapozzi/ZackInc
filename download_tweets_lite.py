@@ -418,6 +418,13 @@ while not updates:
 # Gets the id for the active chat
 
 chat_id=updates[-1]['message']['chat']['id']
+c = open('/home/pi/zack/telegram_chat_id_class', 'w')
+c.write("%s" % (chat_id.__class__))
+c.close()
+c = open('/home/pi/zack/telegram_chat_id', 'w')
+c.write(str(chat_id))
+c.close()
+
 
 # Sends a message to the chat
 msg = "DL Tweets done: %s tweets read; %s new tweets from %s accounts." % ("{:,}".format(session_total_tweets_found), "{:,}".format(session_total_new_tweets), "{:,}".format(session_accounts_scanned))

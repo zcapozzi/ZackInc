@@ -408,6 +408,15 @@ def translate_alt_teams(home_team_full, away_team_full, alt_team1, alt_team2, pr
         #print("Alt Away team was %s, set alt_home_team to %s" % (alt_away_team, alt_home_team))
     return alt_home_team, alt_away_team
 
+def get_laxpower_forum(cursor, team):
+    query = "SELECT twitter_handle from GA_Tracking_Tags where email_campaign_descriptor like %s and campaign_source='LaxPower Forums'"
+    param = ["%s%%" % team]
+    cursor.execute(query, param)
+    res = cursor.fetchone()
+    if res is not None:
+        res = res[0]
+    return res
+
 def get_IL_win_pct():
     url = "http://insidelacrosse.com/league/DI/teams"
 
@@ -483,6 +492,134 @@ def get_tracking_name(tracking_code, cursor):
         return tracking_code
     else:
         return r[0]
+def get_laxref_standings(cursor, yr):
+    url = "http://insidelacrosse.com/league/DI/teams"
+    if yr is not None:
+        url += "/%d" % (yr - 2000)
+    else:
+        yr = datetime.datetime.today().year
+
+    print("Make request...")
+    response = requests.get(url, timeout=20)
+    #print(response.content)
+    regex = re.compile(r'<tr><td><a href\=\"\/team\/.*?\">(.*?)</a></td><td>([0-9]+)</td><td>([0-9]+)</td>')
+    matches = re.findall(regex, response.content)
+    total_wins = 0
+    total_losses = 0
+    teams = []
+    for m in matches:
+        print("Match: %s has %s wins and %s losses" % m)
+        team_name = m[0]
+        team_name = "Detroit" if team_name == "Detroit Mercy" else team_name
+        team_name = "Boston U" if team_name == "Boston University" else team_name
+        team_name = "Massachusetts-Lowell" if team_name == "UMass Lowell" else team_name
+        team_name = "Massachusetts" if team_name == "UMass" else team_name
+        team_name = "Mount St Marys" if team_name == "Mount St Mary's" else team_name
+        team_name = "Hobart and William" if team_name == "Hobart" else team_name
+        team_name = "Loyola MD" if team_name == "Loyola" else team_name
+        team = {'team': team_name, 'IL_wins': int(m[1]), 'IL_losses': int(m[2]), 'LR_wins': 0, 'LR_losses': 0, 'missing': 0}
+        teams.append(team)
+        total_wins += int(m[1])
+        total_losses += int(m[2])
+    print("\nTotal record: %d - %d" % (total_wins, total_losses))
+
+    query = "SELECT count(1) from LaxRef_Games where league='NCAA Men' and year(game_date) = 2017"
+    cursor.execute(query)
+    count = cursor.fetchone()[0]
+    print("The database actually contains %d games from 2017." % (count))
+
+    query = "SELECT confirmed_home_team, count(1) from LaxRef_Games where league='NCAA Men' and not isnull(confirmed_home_team) and not isnull(confirmed_away_team) and  home_score > away_score and year(game_date) = %s and active=1 group by confirmed_home_team"
+    param = [yr]
+    cursor.execute(query, param)
+    res = cursor.fetchall()
+    for r in res:
+
+        if r[0] != "Hampton":
+            found = False
+            for t in teams:
+
+                    if t['team'].strip() == r[0].strip():
+                        t['LR_wins'] += r[1]
+                        found = True
+                        break
+            if not found:
+                teams.append({'team': r[0], 'IL_wins': 0, 'IL_losses': 0, 'LR_wins': r[1], 'LR_losses': 0, 'missing': 0})
+
+
+    query = "SELECT confirmed_home_team, count(1) from LaxRef_Games where league='NCAA Men' and not isnull(confirmed_home_team) and not isnull(confirmed_away_team) and home_score < away_score and year(game_date) = %s and active=1 group by confirmed_home_team"
+    param = [yr]
+    cursor.execute(query, param)
+    res = cursor.fetchall()
+    for r in res:
+        if r[0] == "North Carolina":
+            print("C: %s" % str(r))
+        if r[0] != "Hampton":
+            found = False
+            for t in teams:
+                if t['team'].strip() == r[0].strip():
+                    t['LR_losses'] += r[1]
+                    found = True
+                    break
+            if not found:
+                teams.append({'team': r[0], 'IL_wins': 0, 'IL_losses': 0, 'LR_wins': 0, 'LR_losses': r[1], 'missing': 0})
+
+    query = "SELECT confirmed_away_team, count(1) from LaxRef_Games where league='NCAA Men' and not isnull(confirmed_home_team) and not isnull(confirmed_away_team) and home_score < away_score and year(game_date) = %s and active=1 group by confirmed_away_team"
+    param = [yr]
+    cursor.execute(query, param)
+    res = cursor.fetchall()
+    for r in res:
+        if r[0] == "North Carolina":
+            print("C: %s" % str(r))
+        if r[0] != "Hampton":
+            found = False
+            for t in teams:
+                if t['team'].strip() == r[0].strip():
+                    t['LR_wins'] += r[1]
+                    found = True
+                    break
+            if not found:
+                teams.append({'team': r[0], 'IL_wins': 0, 'IL_losses': 0, 'LR_wins': r[1], 'LR_losses': 0, 'missing': 0})
+
+    query = "SELECT confirmed_away_team, count(1) from LaxRef_Games where league='NCAA Men' and not isnull(confirmed_home_team) and not isnull(confirmed_away_team) and home_score > away_score and year(game_date) = %s and active=1 group by confirmed_away_team"
+    param = [yr]
+    cursor.execute(query, param)
+    res = cursor.fetchall()
+    for r in res:
+        if r[0] == "Brown":
+            print("D: %s" % str(r))
+        if r[0] != "Hampton":
+            found = False
+            for t in teams:
+                if t['team'].strip() == r[0].strip():
+                    t['LR_losses'] += r[1]
+                    found = True
+                    break
+            if not found:
+                teams.append({'team': r[0], 'IL_wins': 0, 'IL_losses': 0, 'LR_wins': 0, 'LR_losses': r[1], 'missing': 0})
+    return teams
+def get_team_colors(cursor):
+    cursor.execute("Select name, IFNULL(fg_color, '(255,255,255,255)'), IFNULL(bg_color, '(0,0,0,255)') from LaxRef_Teams where active=1")
+    results = []
+    res = cursor.fetchall()
+    for r in res:
+        results.append({'Team': r[0],'fg_color': r[1],'bg_color': r[2]})
+    return results
+
+def get_twitter_tracking_tags(cursor):
+    cursor.execute("Select twitter_handle, campaign_content from GA_Tracking_Tags where campaign_source='twitter'")
+    results = []
+    res = cursor.fetchall()
+    for r in res:
+        results.append({'handle': r[0],'code': r[1]})
+    return results
+
+def get_twitter_handles(cursor):
+    cursor.execute("Select name, IFNULL(twitter_handle, '') from LaxRef_Teams where active=1")
+    results = []
+    res = cursor.fetchall()
+    for r in res:
+        results.append({'Team': r[0],'handle': r[1]})
+    return results
 
 def get_team_colors(cursor):
     cursor.execute("Select name, IFNULL(fg_color, '(255,255,255,255)'), IFNULL(bg_color, '(0,0,0,255)') from LaxRef_Teams where active=1")

@@ -27,6 +27,41 @@ import zlib
 sys.path.insert(0, "../ZackInc")
 import zack_inc as zc
 
+def check_for_missing_games():
+    teams = zc.get_laxref_standings(datetime.datetime.now().year)
+    #print teams
+    missing_teams = []
+    duplicate_teams = []
+    total_missing_games = 0
+    total_duplicate_games = 0
+    total_games = 0
+    for t in teams:
+        if t['LR_wins'] + t['LR_losses'] == t['IL_wins'] + t['IL_losses']:
+            total_games += t['LR_wins'] + t['LR_losses']
+        else:
+            if t['LR_wins'] + t['LR_losses'] > t['IL_wins'] + t['IL_losses']:
+                duplicate_teams.append(t['team'])
+                total_duplicate_games += (t['LR_wins'] + t['LR_losses']) - (t['IL_wins'] + t['IL_losses'])
+            else:
+                missing_teams.append(t['team'])
+                total_missing_games -= (t['LR_wins'] + t['LR_losses']) - (t['IL_wins'] + t['IL_losses'])
+
+    total_games /= 2
+    if total_missing_games == 0 and total_duplicate_games == 0:
+        msg = " All good, %d total games captured." % total_games
+    else:
+        if total_missing_games > 0 and total_duplicate_games > 0:
+            msg = "There are %.1f games that haven't been recorded and %.1f games that seem to have been recorded twice." % (float(total_missing_games)/2, float(total_duplicate_games)/2)
+            msg += "\nMissing Teams: %s" % ", ".join(missing_teams)
+            msg += "\nDuplicate Teams: %s" % ", ".join(duplicate_teams)
+        elif total_duplicate_games > 0:
+            msg = "There are %.1f games that seem to have been recorded twice." % (float(total_duplicate_games)/2)
+            msg += "\nDuplicate Teams: %s" % ", ".join(duplicate_teams)
+        elif total_missing_games > 0 :
+            msg = "There are %.1f games that haven't been recorded." % (float(total_missing_games)/2)
+            msg += "\nMissing Teams: %s" % ", ".join(missing_teams)
+
+    return msg
 
 def mysql_connect():
     cnx = None
@@ -114,6 +149,19 @@ if len(updates) > 0:
                             args = ['/home/pi/zack/backup_default.sh', '&']
                             print(args)
                             proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+                    elif text.lower().startswith('check standings'):
+                        return_msg = "Starting the missing games check..."
+                        return_msg = check_for_missing_games()
+                    elif text.lower().startswith('refresh games'):
+                        return_msg = "Kicking off game scrape now..."
+                        args = ['python', '/home/pi/zack/LacrosseReference/get_official_ncaa_game_data.py','-notify', '&']
+                        print(args)
+                        proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+                    elif text.lower().startswith('update stats'):
+                        return_msg = "Kicking off stats update..."
+                        args = ['/home/pi/zack/LacrosseReference/refresh_statistical_tables.sh', '&']
+                        print(args)
+                        proc = subprocess.Popen(args, stdout=subprocess.PIPE)
                     elif text.lower().startswith("add twitter"):
                         mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor();
                         tokens = text.split(" ")

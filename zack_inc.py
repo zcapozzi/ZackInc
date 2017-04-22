@@ -492,7 +492,12 @@ def get_tracking_name(tracking_code, cursor):
         return tracking_code
     else:
         return r[0]
-def get_laxref_standings(cursor, yr):
+
+def get_laxref_standings(yr, cursor=None):
+    reconnect = False
+    if cursor is None:
+        reconnect = True
+        mysql_conn, r = mysql_connect(); cursor = mysql_conn.cursor()
     url = "http://insidelacrosse.com/league/DI/teams"
     if yr is not None:
         url += "/%d" % (yr - 2000)
@@ -528,7 +533,7 @@ def get_laxref_standings(cursor, yr):
     count = cursor.fetchone()[0]
     print("The database actually contains %d games from 2017." % (count))
 
-    query = "SELECT confirmed_home_team, count(1) from LaxRef_Games where league='NCAA Men' and not isnull(confirmed_home_team) and not isnull(confirmed_away_team) and  home_score > away_score and year(game_date) = %s and active=1 group by confirmed_home_team"
+    query = "SELECT confirmed_home_team, count(1) from LaxRef_Games where IFNULL(game_type,'')='' and league='NCAA Men' and not isnull(confirmed_home_team) and not isnull(confirmed_away_team) and  home_score > away_score and year(game_date) = %s and active=1 group by confirmed_home_team"
     param = [yr]
     cursor.execute(query, param)
     res = cursor.fetchall()
@@ -596,14 +601,20 @@ def get_laxref_standings(cursor, yr):
                     break
             if not found:
                 teams.append({'team': r[0], 'IL_wins': 0, 'IL_losses': 0, 'LR_wins': 0, 'LR_losses': r[1], 'missing': 0})
+    if reconnect:
+        cursor.close(); mysql_conn.close()
     return teams
-def get_team_colors(cursor):
-    cursor.execute("Select name, IFNULL(fg_color, '(255,255,255,255)'), IFNULL(bg_color, '(0,0,0,255)') from LaxRef_Teams where active=1")
-    results = []
-    res = cursor.fetchall()
-    for r in res:
-        results.append({'Team': r[0],'fg_color': r[1],'bg_color': r[2]})
-    return results
+
+def get_team_gif(team):
+    tteam = team.replace("North Carolina", "UNC").replace("Johns Hopkins", "JHU").replace("Penn State", "PSU").replace("Ohio State", "OSU").lower()
+    if os.path.isfile(os.path.join("/home/pi/zack/LacrosseReference/TeamLogos", "%s.gif" % tteam)):
+        return os.path.join("/home/pi/zack/LacrosseReference/TeamLogos", "%s.gif" % tteam)
+    elif os.path.isfile(os.path.join("/home/pi/zack/LacrosseReference/TeamLogos", "%s.jpg" % tteam)):
+        return os.path.join("/home/pi/zack/LacrosseReference/TeamLogos", "%s.jpg" % tteam)
+    elif os.path.isfile(os.path.join("/home/pi/zack/LacrosseReference/TeamLogos", "%s.png" % tteam)):
+        return os.path.join("/home/pi/zack/LacrosseReference/TeamLogos", "%s.png" % tteam)
+
+    return None
 
 def get_twitter_tracking_tags(cursor):
     cursor.execute("Select twitter_handle, campaign_content from GA_Tracking_Tags where campaign_source='twitter'")
@@ -611,6 +622,28 @@ def get_twitter_tracking_tags(cursor):
     res = cursor.fetchall()
     for r in res:
         results.append({'handle': r[0],'code': r[1]})
+    return results
+
+def get_season_value(cursor, year, team):
+    query = "SELECT team, url_week, votes from LaxRef_Rankings where team=%s and year=%s and active=1 order by week asc"
+    param = [team, year - 2000]
+    cursor.execute(query, param)
+    res = cursor.fetchall()
+    exponential = 1
+    inc = .08
+    total_season_value = 0
+    for r in res:
+        total_season_value += r[2] * exponential
+        exponential *= (1 + inc)
+
+    return total_season_value
+
+def get_team_url(cursor):
+    cursor.execute("Select name, IL_url from LaxRef_Teams where active=1")
+    results = []
+    res = cursor.fetchall()
+    for r in res:
+        results.append({'Team': r[0],'url': r[1]})
     return results
 
 def get_twitter_handles(cursor):
